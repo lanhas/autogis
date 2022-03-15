@@ -16,7 +16,7 @@ class Mtvcd(Dataset):
         self.transform = transform
         self.image_set = image_set
         image_dir = self.root_mtvcd / "JPEGImages"
-        split_f = self.root_mtvcd / "ImageSets" / "Classification" / (image_set + '.txt')
+        split_f = self.root_mtvcd / "ImageSets" / (image_set + '.txt')
         if not os.path.exists(split_f):
             raise ValueError(
                 'Wrong image_set entered! Please use image_set="train" '
@@ -49,7 +49,7 @@ class SiameseMtvcd(Dataset):
         self.root_mtvcd = Path(root_mtvcd)
         self.transform = transform
         self.image_set = image_set
-        image_dir = self.root_mtvcd / "villageMask"
+        image_dir = self.root_mtvcd / "JPEGImages"
         split_f = self.root_mtvcd / "ImageSets" / (image_set + '.txt')
         if not os.path.exists(split_f):
             raise ValueError(
@@ -126,7 +126,7 @@ class TripletMtvcd(Dataset):
         self.root_mtvcd = Path(root_mtvcd)
         self.transform = transform
         self.image_set = image_set
-        image_dir = self.root_mtvcd / "villageMask"
+        image_dir = self.root_mtvcd / "JPEGImages"
         split_f = self.root_mtvcd / "ImageSets" / (image_set + '.txt')
         if not os.path.exists(split_f):
             raise ValueError(
@@ -222,8 +222,3 @@ class BalancedBatchSampler(BatchSampler):
     def __len__(self):
         return self.n_dataset // self.batch_size
 
-
-if __name__ == "__main__":
-    train_dst= Mtvcd(r'F:\code\python\SemanticSegmentation\autogis\datasets\mtvcd', 'val')
-    image, label = train_dst[0]
-    image.show()

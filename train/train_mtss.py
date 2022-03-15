@@ -23,21 +23,21 @@ def get_dataset(data_root, crop_size=512):
             et.ExtToTensor(),
             et.ExtNormalize(mean_image=[0.2737, 0.3910, 0.3276],
                             std_image=[0.1801, 0.1560, 0.1301],
-                            mean_dem = [0.4153],
-                            std_dem = [0.2405]
+                            mean_dem=[0.4153],
+                            std_dem=[0.2405]
                             ),
         ])
     val_transform = et.ExtCompose([
             et.ExtToTensor(),
             et.ExtNormalize(mean_image=[0.2737, 0.3910, 0.3276],
                             std_image=[0.1801, 0.1560, 0.1301],
-                            mean_dem = [0.4153],
-                            std_dem = [0.2405]),
+                            mean_dem=[0.4153],
+                            std_dem=[0.2405]),
         ])
     train_dst = villageFactorsSegm(root_mtsd=data_root,
-                                    image_set='train', transform=train_transform)
+                                   image_set='train', transform=train_transform)
     val_dst = villageFactorsSegm(root_mtsd=data_root, 
-                                    image_set='val', transform=val_transform)
+                                 image_set='val', transform=val_transform)
     return train_dst, val_dst
 
 
@@ -69,11 +69,10 @@ def validate(model_name, model, loader, device, metrics, ret_samples_ids=None):
 
 
 def train():
-    #--------------------------------#
-    #-----------超参数----------------#
-    #--------------------------------#
+
+    # 超参数设置
     ckpt = None
-    enable_vis = True
+    enable_vis = False
     # model_name = 'mtss_resnet50'
     model_name = 'deeplabv3plus_resnet50'
 
@@ -89,7 +88,7 @@ def train():
     crop_size = 512
     continue_training = False
     loss_type = 'cross_entropy'     # choices=['cross_entropy', 'focal_loss']
-    lr_policy = 'poly'      # choice=['poly', 'step']
+    lr_policy = 'poly'              # choice=['poly', 'step']
     
     # deeplab options
     separable_conv = False
@@ -106,14 +105,11 @@ def train():
     vis_num_samples = 2
     enable_apex = False
 
-    # ------------------------------#
-    #--------------end--------------#
-    #-------------------------------#
-
+    # end
     # setup visualization
-    vis = Visualizer(port=vis_port, env=vis_env) if enable_vis else None
+    vis = Visualizer(port=vis_port, env=vis_env, use_incoming_socket=False) if enable_vis else None
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print("Device: %s" %device)
+    print("Device: %s" % device)
 
     # setup random seed
     torch.manual_seed(random_seed)
@@ -121,18 +117,21 @@ def train():
     random.seed(random_seed)
 
     # setup dataloader
-    if  not crop_val:
+    if not crop_val:
         val_batch_size = 1
     
     # setup training_log
-    if training_log == True:
-        file_handle = open('./train/logs/trainLog_villageLand.txt', mode='a+')
+    # utils.mkdir('./train/logs')
+    if training_log:
+        file_handle = open('train/logs/trainLog_villageLand.txt', mode='a+')
         file_handle.writelines([
         '*---------------------------------------------------------------------------------------------------------------------------------*\n',
         '*--------------------------------------------------------- 训练日志 ---------------------------------------------------------------*\n',
-        '训练日期： ' + str(datetime.datetime.strftime(datetime.datetime.now(),'%Y-%m-%d %H:%M:%S')) +'\n',
+        '训练日期： ' + str(datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d %H:%M:%S')) +'\n',
             ])
         file_handle.close()
+
+    # load data
     train_dst, val_dst = get_dataset(data_root, crop_size)
     train_loader = data.DataLoader(
         train_dst, batch_size=batch_size, shuffle=True, num_workers=2, drop_last=True)
@@ -158,9 +157,9 @@ def train():
 
     # set up optimizer
     optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
-    if lr_policy=='poly':
+    if lr_policy == 'poly':
         scheduler = utils.PolyLR(optimizer, total_itrs, power=0.9)
-    elif lr_policy=='step':
+    elif lr_policy == 'step':
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)
     # set up apex
     # set up criterion

@@ -1,13 +1,14 @@
 import network
 import torch
 import os
+
 import torch.nn as nn
 import utils
 import numpy as np
 from torchvision import transforms as T
 from torch.utils import data
 from torch.optim import lr_scheduler
-from DataSets.mtvcd import Mtvcd, SiameseMtvcd, BalancedBatchSampler, TripletMtvcd
+from datasets.mtvcd import Mtvcd, SiameseMtvcd, BalancedBatchSampler, TripletMtvcd
 from tqdm import tqdm
 from visdom import Visdom
 
@@ -127,7 +128,7 @@ def test_epoch(val_loader, model, loss_fn, device, metrics=[]):
 
 def train():
     ckpt = None
-    enable_vis = True
+    enable_vis = False
     continue_training = False
     # train
     model_name = 'siameseNetwork'  # {'classificationNet', 'siameseNetwork', 'tripletNetwork',
@@ -194,6 +195,8 @@ def train():
     val_sampler = BalancedBatchSampler(val_dst.labels, num_classes, n_samples)
     train_loader = data.DataLoader(train_dst, batch_sampler=train_sampler)
     val_loader = data.DataLoader(val_dst, batch_sampler=val_sampler)
+    print("Dataset: Train set: %d, Val set: %d" %
+          (len(train_dst), len(val_dst)))
     # set up model
     model_map = {
         'classificationNet': network.classificationNet,
