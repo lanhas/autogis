@@ -1,7 +1,6 @@
 import network
 import torch
 import os
-
 import torch.nn as nn
 import utils
 import numpy as np

@@ -1,21 +1,15 @@
-import utils
-import random
+import os
 import numpy as np
-import time
-import shutil
-import datetime
+from utils import metrics
 from network.unet import UNet, UNetSmall
 from torch.utils import data
 from datasets.road import RoadSegm
-from utils import ext_transforms as et 
-from utils.metrics import MtssMetrics, RoadMetrics
+from utils import ext_transforms as et
 from utils import losses
-from utils import scheduler
 from utils.visualizer import Visualizer
 from pathlib import Path
 from tqdm import tqdm
 import torch
-import torch.nn as nn
 
 
 # 数据加载
@@ -30,6 +24,7 @@ def get_dataset(data_root, crop_size=512):
                             ),
         ])
     val_transform = et.ExtCompose([
+            et.ExtRandomCrop(size=(512, 512), pad_if_needed=True),
             et.ExtToTensor(),
             et.ExtNormalize(mean=[0.4075, 0.3807, 0.2848],
                             std=[0.1569, 0.1256, 0.1210],
@@ -52,18 +47,18 @@ def main():
     lr = 1e-3                   # initial learning rate (default: 1e-3)
     weight_decay = 1e-4         #
     jt_loss_weight = 1.0        # weight of Dice or Jaccard term of the joint loss (default: 1.0)
-    step_size = 12             # 等间隔调整学习率
-    batch_size = 4              # mini-batch size (default: 128)
+    step_size = 12              # 等间隔调整学习率
+    train_batchsize = 6          # mini-batch size (default: 128)
+    val_batchsize = 2
     crop_size = 112             # number of cropped pixels from orig image (default: 112)
-    continue_training = False
     lovasz_loss = False
-    lr_policy = 'poly'
     data_root = Path(r'F:\Dataset\road dataset')  # path to dataset (parent dir of train and val)
 
     # visdom
     print_freq = 30            # number of time to log per epoch (default: 30)
     vis_port = 12370
-    vis_env = 'main'
+    visenv_train = 'train'
+    visenv_valid = 'valid'
 
     # other
     hard_mining = False         # whether use hard negative mining (default: False)
@@ -72,13 +67,15 @@ def main():
     vis_num_samples = 2
 
     # time
-    since = time.time()
-    sv_name = datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')
-    print('saving file name is ', sv_name)
+    # since = time.time()
+    # sv_name = datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')
+    # print('saving file name is ', sv_name)
     # end
 
     # setup visualization
-    vis = Visualizer(port=vis_port, env=vis_env) if enable_vis else None
+    vis_train = Visualizer(port=vis_port, env=visenv_train) if enable_vis else None
+    vis_valid = Visualizer(port=vis_port, env=visenv_valid) if enable_vis else None
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Device: %s" % device)
 
@@ -100,10 +97,7 @@ def main():
     optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
 
     # decay LR
-    if lr_policy == 'poly':
-        scheduler = utils.PolyLR(optimizer, total_itrs, power=0.9)
-    elif lr_policy == 'step':
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)
 
     # starting params
     best_loss = 999
@@ -122,19 +116,19 @@ def main():
             optimizer.load_state_dict(checkpoint['optimizer'])
             print("=> loaded checkpoint '{}' (epoch {})".format(ckpt_path, checkpoint['epoch']))
         else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
+            print("=> no checkpoint found at '{}'".format(ckpt_path))
 
     # set up dataloader
     train_dst, val_dst = get_dataset(data_root, crop_size)
     train_loader = data.DataLoader(
-        train_dst, batch_size=batch_size, shuffle=True, num_workers=2, drop_last=True)
+        train_dst, batch_size=train_batchsize, shuffle=True, num_workers=2, drop_last=True)
     val_loader = data.DataLoader(
-        val_dst, batch_size=val_batch_size, shuffle=True, num_workers=2, drop_last=True)
+        val_dst, batch_size=val_batchsize, shuffle=True, num_workers=2, drop_last=True)
     print("Dataset: Train set: %d, Val set: %d" %
           (len(train_dst), len(val_dst)))
 
-    train_logger = None
-    val_logger = None
+    train_logger = {'vis': vis_train, 'print_freq': print_freq}
+    val_logger = {'vis': vis_valid, 'print_freq': print_freq}
 
     # ----------------------------------------train Loop---------------------------------- #
     vis_sample_id = np.random.randint(0, len(val_loader), vis_num_samples,
@@ -143,23 +137,20 @@ def main():
     for epoch in range(start_epoch, epochs):
         print('Epoch {}/{}'.format(epoch, epochs - 1))
         print('-' * 10)
-
-        if lr_policy == 'step_lr':
-            if epoch == cycle_start_epoch:
-                print("Starting cyclic lr")
-                print("initial lr: ", args.lr)
-                torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
-            if epoch >= cycle_start_epoch:
-                lr = cyclic_lr(optimizer, epoch - args.cycle_start_epoch, init_lr=args.lr, num_epochs_per_cycle=5,
-                               cycle_epochs_decay=2, lr_decay_factor=0.1)
-                print("cycling lr: ", lr)
-            else:
-                scheduler.step()
+        # step the learning rate scheduler
+        if epoch == cycle_start_epoch:
+            print("Starting cyclic lr")
+            print("initial lr: ", lr)
+            optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
+        if epoch >= cycle_start_epoch:
+            lr = cyclic_lr(optimizer, epoch - cycle_start_epoch, init_lr=lr, num_epochs_per_cycle=5,
+                           cycle_epochs_decay=2, lr_decay_factor=0.1)
+            print("cycling lr: ", lr)
         else:
-            scheduler.step()
+            lr_scheduler.step()
 
         # run training and validation
-        train_metrics = train(train_loader, model, optimizer, scheduler, criterion, train_logger, epoch, lovasz_loss)
+        train_metrics = train(train_loader, model, optimizer, lr_scheduler, criterion, train_logger, epoch, lovasz_loss)
         valid_metrics = validate(val_loader, model, criterion, val_logger, epoch, lovasz_loss)
 
         is_best_loss = valid_metrics['valid_loss'] < best_loss
@@ -167,25 +158,26 @@ def main():
 
         best_loss = min(valid_metrics['valid_loss'], best_loss)
         best_acc = max(valid_metrics['valid_acc'], best_acc)
-
+        sv_name = "{}-Valloss_{}-Acc_{}-Epoch_{}".format(model_name, \
+                  valid_metrics['valid_loss'], valid_metrics['valid_acc'], epoch)
         if acc_best:
             # print('saving loss best model')
             save_checkpoint({
                 'epoch': epoch,
-                'arch': args.model,
+                'arch': model,
                 'state_dict': model.state_dict(),
                 'best_loss': best_loss,
-                'best_acc' : best_acc,
+                'best_acc': best_acc,
                 'optimizer': optimizer.state_dict()
             }, is_best_loss, sv_name)
         else:
             # print('saving accuracy best model')
             save_checkpoint({
                 'epoch': epoch,
-                'arch': args.model,
+                'arch': model,
                 'state_dict': model.state_dict(),
                 'best_loss': best_loss,
-                'best_acc' : best_acc,
+                'best_acc': best_acc,
                 'optimizer': optimizer.state_dict()
             }, is_best_acc, sv_name)
 
@@ -193,14 +185,22 @@ def main():
 def save_checkpoint(state, is_best, name):
     """ save current model
     """
-    checkpoint_dir = Path('./checkpoints')
-    if not checkpoint_dir.isdir():
+    checkpoint_dir = Path('./checkpoints/road')
+    if not checkpoint_dir.is_dir():
         checkpoint_dir.mkdir()
-    filename = checkpoint_dir / (name + '_checkpoint.pth')
+    filename = checkpoint_dir / (name + '.pth')
     torch.save(state, filename)
     if is_best:
-        filename_best = checkpoint_dir / (name + '_model_best.pth')
+        filename_best = checkpoint_dir / ('best' + name + '.pth')
         filename_best.write_bytes(filename.read_bytes())
+
+
+def cyclic_lr(optimizer, epoch, init_lr=1e-4, num_epochs_per_cycle=5, cycle_epochs_decay=2, lr_decay_factor=0.5):
+    epoch_in_cycle = epoch % num_epochs_per_cycle
+    lr = init_lr * (lr_decay_factor ** (epoch_in_cycle // cycle_epochs_decay))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+    return lr
 
 
 def make_train_step(data, model, optimizer, criterion, meters, lovasz_loss):
@@ -223,16 +223,16 @@ def make_train_step(data, model, optimizer, criterion, meters, lovasz_loss):
     loss.backward()
     optimizer.step()
 
-    meters["train_acc"].update(meters.dice_coeff(outputs, labels), outputs.size(0))
-    meters["train_loss"].update(loss.data[0], outputs.size(0))
-    meters["train_IoU"].update(meters.jaccard_index(outputs, labels), outputs.size(0))
-    meters["train_BCE"].update(BCE_loss.data[0], outputs.size(0))
-    meters["train_DICE"].update(DICE_loss.data[0], outputs.size(0))
+    meters["train_acc"].update(metrics.dice_coeff(outputs, labels), outputs.size(0))
+    meters["train_loss"].update(loss.item(), outputs.size(0))
+    meters["train_IoU"].update(metrics.jaccard_index(outputs, labels), outputs.size(0))
+    meters["train_BCE"].update(BCE_loss.item(), outputs.size(0))
+    meters["train_DICE"].update(DICE_loss.item(), outputs.size(0))
     meters["outputs"] = outputs
-    return metrics
+    return meters
 
 
-def train(train_loader, model, optimizer, scheduler, criterion, logger, epoch_num, lovasz_loss):
+def train(train_loader, model, optimizer, lr_scheduler, criterion, logger, epoch_num, lovasz_loss):
 
     # logging accuracy and loss
     train_acc = metrics.MetricTracker()
@@ -245,39 +245,35 @@ def train(train_loader, model, optimizer, scheduler, criterion, logger, epoch_nu
               "train_IoU": train_IoU, "train_BCE": train_BCE,
               "train_DICE": train_DICE, "outputs": None}
 
-    # log_iter = len(train_loader) // logger.print_freq
+    log_iter = len(train_loader) // logger['print_freq']
 
     model.train()
 
-    scheduler.step()
+    lr_scheduler.step()
 
     # iterate over data
     for idx, data in enumerate(tqdm(train_loader)):
         meters = make_train_step(data, model, optimizer, criterion, meters, lovasz_loss)
+        if idx % log_iter == 0:
+            step = (epoch_num*logger['print_freq'])+(idx/log_iter)
 
-        # if idx % log_iter == 0:
-        #     step = (epoch_num*logger.print_freq)+(idx/log_iter)
-        #
-        #     # log accurate and loss
-        #     info = {
-        #         'loss': meters["train_loss"].avg,
-        #         'accuracy': meters["train_acc"].avg,
-        #         'IoU': meters["train_IoU"].avg
-        #     }
-        #
-        #     for tag, value in info.items():
-        #         logger.scalar_summary(tag, value, step)
-        #     log_img = [
-        #         data_utils.show_tensorboard_image(data['sat_img'], data['map_img'], meters["outputs"], as_numpy=True), ]
-        #     logger.image_summary('train_images', log_img, step)
+            # log accurate and loss
+            info = {
+                'loss': meters["train_loss"].avg,
+                'accuracy': meters["train_acc"].avg,
+                'IoU': meters["train_IoU"].avg
+            }
+
+            for tag, value in info.items():
+                logger['vis'].vis_scalar(tag, step, value)
 
     print('Training Loss: {:.4f} BCE: {:.4f} DICE: {:.4f} Acc: {:.4f} IoU: {:.4f} '.format(
             meters["train_loss"].avg, meters["train_BCE"].avg, meters["train_DICE"].avg, meters["train_acc"].avg, meters["train_IoU"].avg))
     print()
     
-    return {'train_loss': metrics["train_loss"].avg, 'train_acc': metrics["train_acc"].avg, 
-            'train_IoU': metrics["train_IoU"].avg, 'train_BCE': metrics["train_BCE"].avg,
-            'train_DICE': metrics["train_DICE"].avg}
+    return {'train_loss': meters["train_loss"].avg, 'train_acc': meters["train_acc"].avg,
+            'train_IoU': meters["train_IoU"].avg, 'train_BCE': meters["train_BCE"].avg,
+            'train_DICE': meters["train_DICE"].avg}
 
 
 def validate(valid_loader, model, criterion, logger, epoch_num, lovasz_loss):
@@ -288,15 +284,15 @@ def validate(valid_loader, model, criterion, logger, epoch_num, lovasz_loss):
     valid_BCE = metrics.MetricTracker()
     valid_DICE = metrics.MetricTracker()
 
-    # log_iter = len(valid_loader) // logger.print_freq
+    log_iter = len(valid_loader) // logger['print_freq']
 
     model.eval()
 
     # Iterate over Data
-    for idx, data in enumerate(tqdm(valid_loader), desc='validation'):
+    for idx, data in enumerate(tqdm(valid_loader)):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         images = data[0].to(device, dtype=torch.float32)
-        labels = data[1].to(device, dtype=torch.long)
+        labels = data[1].to(device, dtype=torch.float32)
         # forward
         outputs = model(images)
         # pay attention to the weighted loss should input logits not probs
@@ -307,10 +303,24 @@ def validate(valid_loader, model, criterion, logger, epoch_num, lovasz_loss):
             outputs = torch.sigmoid(outputs)
             loss, BCE_loss, DICE_loss = criterion(outputs, labels)
         valid_acc.update(metrics.dice_coeff(outputs, labels), outputs.size(0))
-        valid_loss.update(loss.data[0], outputs.size(0))
+        valid_loss.update(loss.item(), outputs.size(0))
         valid_IoU.update(metrics.jaccard_index(outputs, labels), outputs.size(0))
-        valid_BCE.update(BCE_loss.data[0], outputs.size(0))
-        valid_DICE.update(DICE_loss.data[0], outputs.size(0))
+        valid_BCE.update(BCE_loss.item(), outputs.size(0))
+        valid_DICE.update(DICE_loss.item(), outputs.size(0))
+
+        # visdom logging
+        if idx % log_iter == 0:
+            step = (epoch_num*logger['print_freq'])+(idx/log_iter)
+
+            # log accuracy and loss
+            info = {
+                'loss': valid_loss.avg,
+                'accuracy': valid_acc.avg,
+                'IoU': valid_IoU.avg
+            }
+
+            for tag, value in info.items():
+                logger['vis'].vis_scalar(tag, step, value)
 
     # logging
     print('Validation Loss: {:.4f} BCE: {:.4f} DICE: {:.4f} Acc: {:.4f} IoU: {:.4f}'.format(

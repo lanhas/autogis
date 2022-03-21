@@ -1,16 +1,14 @@
 import utils
-import os
-import random
 import numpy as np
 import network
-import datetime
-from torch.utils import data
-from datasets.mtsd import villageFactorsSegm
-from utils import mul_transforms as et
-from utils.metrics import MtssMetrics
 import torch
 import torch.nn as nn
 from tqdm import tqdm
+from pathlib import Path
+from torch.utils import data
+from utils.metrics import MtssMetrics
+from datasets.mtsd import villageFactorsSegm
+from utils import mul_transforms as et
 from utils.visualizer import Visualizer
 
 
@@ -28,6 +26,7 @@ def get_dataset(data_root, crop_size=512):
                             ),
         ])
     val_transform = et.ExtCompose([
+            et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             et.ExtToTensor(),
             et.ExtNormalize(mean_image=[0.2737, 0.3910, 0.3276],
                             std_image=[0.1801, 0.1560, 0.1301],
@@ -41,106 +40,48 @@ def get_dataset(data_root, crop_size=512):
     return train_dst, val_dst
 
 
-def validate(model_name, model, loader, device, metrics, ret_samples_ids=None):
-    metrics.reset()
-    ret_samples = []
-    with torch.no_grad():
-        for i, (images, dems, labels) in tqdm(enumerate(loader)):
-            images = images.to(device, dtype=torch.float32)
-            
-            labels = labels.to(device, dtype=torch.long)
-            if model_name[:4] == 'mtss':
-                dems = dems.to(device, dtype=torch.float32)
-                outputs = model(images, dems)
-            else:
-                dems = dems.to(device, dtype=torch.float32)
-                images = torch.cat((images, dems), 1)
-                outputs = model(images)
-            preds = outputs.detach().max(dim=1)[1].cpu().numpy()
-            targets = labels.cpu().numpy()
-
-            metrics.update(targets, preds)
-            if ret_samples_ids is not None and i in ret_samples_ids:
-                ret_samples.append(
-                    (images[0].detach().cpu().numpy(), targets[0], preds[0])
-                )
-        score = metrics.get_results()
-    return score, ret_samples
-
-
-def train():
-
+def main():
     # 超参数设置
-    ckpt = None
-    enable_vis = False
-    # model_name = 'mtss_resnet50'
-    model_name = 'deeplabv3plus_resnet50'
+    start_epoch = 0
+    epochs = 75
+    ckpt_path = Path('')
+    enable_vis = True
+    model_name = 'mtss_resnet50'
 
-    # train
-    lr = 1e-2
-    weight_decay = 1e-4     # SGD优化器权值衰减
-    total_itrs = 30000
-    step_size = 10000       # 等间隔调整学习率
     num_classes = 7
-    batch_size = 2
-    crop_val = False
-    val_batch_size = 2
-    crop_size = 512
-    continue_training = False
-    loss_type = 'cross_entropy'     # choices=['cross_entropy', 'focal_loss']
-    lr_policy = 'poly'              # choice=['poly', 'step']
-    
+
     # deeplab options
     separable_conv = False
-    output_stride = 16      # choices=[8, 16]
+    output_stride = 16  # choices=[8, 16]
+
+    # train
+    lr = 1e-4
+    lr_policy = 'cyclic_lr'
+    max_lr = 1e-3
+    weight_decay = 1e-4
+    step_size = 12
+
+    train_batchsize = 2
+    val_batchsize = 2
+    crop_size = 256
+    loss_type = 'cross_entropy'  # choices=['cross_entropy', 'focal_loss']
+    data_root = Path(r'F:\Dataset\tradition_villages1\Segmentation')
+
     # visdom
+    print_freq = 10
     vis_port = 12370
     vis_env = 'main'
 
-    # others
-    data_root = r'F:\Dataset\tradition_villages1\Segmentation'
-    val_interval = 100  # 每n个iter计算一次acc、iou
-    training_log = True
-    random_seed = 1
+    # other
     vis_num_samples = 2
-    enable_apex = False
 
-    # end
     # setup visualization
-    vis = Visualizer(port=vis_port, env=vis_env, use_incoming_socket=False) if enable_vis else None
+    vis = Visualizer(port=vis_port, env=vis_env) if enable_vis else None
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Device: %s" % device)
 
-    # setup random seed
-    torch.manual_seed(random_seed)
-    np.random.seed(random_seed)
-    random.seed(random_seed)
-
-    # setup dataloader
-    if not crop_val:
-        val_batch_size = 1
-    
-    # setup training_log
-    # utils.mkdir('./train/logs')
-    if training_log:
-        file_handle = open('train/logs/trainLog_villageLand.txt', mode='a+')
-        file_handle.writelines([
-        '*---------------------------------------------------------------------------------------------------------------------------------*\n',
-        '*--------------------------------------------------------- 训练日志 ---------------------------------------------------------------*\n',
-        '训练日期： ' + str(datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d %H:%M:%S')) +'\n',
-            ])
-        file_handle.close()
-
-    # load data
-    train_dst, val_dst = get_dataset(data_root, crop_size)
-    train_loader = data.DataLoader(
-        train_dst, batch_size=batch_size, shuffle=True, num_workers=2, drop_last=True)
-    val_loader = data.DataLoader(
-        val_dst, batch_size=val_batch_size, shuffle=True, num_workers=2, drop_last=True)
-    print("Dataset: Train set: %d, Val set: %d" %
-          (len(train_dst), len(val_dst)))
-
-    # set up model
+    # setup model
     model_map = {
         'mtss_resnet50': network.mtss_resnet50,
         'deeplabv3plus_resnet50': network.deeplabv3plus_resnet50,
@@ -149,131 +90,236 @@ def train():
         'mtss_mobilenet': network.mtss_mobilenet,
         'deeplabv3plus_mobilenet': network.deeplabv3plus_mobilenet
     }
-    model = model_map[model_name](num_classes=num_classes, output_stride=output_stride, pretrained_backbone=True)
+    model = model_map[model_name](num_classes=num_classes, output_stride=output_stride,
+                                  pretrained_backbone=True).to(device)
     if separable_conv:
         network.convert_to_separable_conv(model.segmention)
     utils.set_bn_momentum(model.backbone, momentum=0.01)
-    metrics = MtssMetrics(num_classes)
 
-    # set up optimizer
-    optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
-    if lr_policy == 'poly':
-        scheduler = utils.PolyLR(optimizer, total_itrs, power=0.9)
-    elif lr_policy == 'step':
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)
-    # set up apex
-    # set up criterion
+    # setup criterion
     if loss_type == 'focal_loss':
         criterion = utils.FocalLoss(ignore_index=255, size_average=True)
     elif loss_type == 'cross_entropy':
         criterion = nn.CrossEntropyLoss(ignore_index=255, reduction='mean')
-
-    def save_ckpt(path):
-        """ save current model
-        """
-        torch.save({
-            "cur_itrs": cur_itrs,
-            "model_state": model.module.state_dict(),
-            "optimizer_state": optimizer.state_dict(),
-            "scheduler_state": scheduler.state_dict(),
-            "best_score": best_score,
-        }, path)
-        print("Model saved as %s" % path)
-    
-    utils.mkdir('checkpoints/villageLand')
-    # Restore
-    best_score = 0.0
-    cur_itrs = 0
-    cur_epochs = 0
-    if ckpt is not None and os.path.isfile(ckpt):
-        checkpoint = torch.load(ckpt, map_location=torch.device('cpu'))
-        model.load_state_dict(checkpoint["model_state"])
-        model = nn.DataParallel(model)
-        model.to(device)
-        if continue_training:
-            optimizer.load_state_dict(checkpoint["optimizer_state"])
-            scheduler.load_state_dict(checkpoint["scheduler_state"])
-            cur_itrs = checkpoint["cur_itrs"]
-            best_score = checkpoint['best_score']
-            print("Training state restored from %s" % ckpt)
-        print("Model restored from %s" % ckpt)
-        del checkpoint  # free memory
     else:
-        print("[!] Retrain")
-        model = nn.DataParallel(model)
-        model.to(device)
+        raise ValueError("loss_type name error! Please check!")
 
-    #----------------------------------------train Loop----------------------------------#
+    # set up optimizer
+    optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
+
+    # decay LR
+    if lr_policy == 'poly':
+        lr_scheduler = utils.PolyLR(optimizer, epochs, power=0.9)
+    elif lr_policy == 'step':
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)
+    elif lr_policy == 'cyclic_lr':
+        lr_scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=lr,
+                                                         max_lr=max_lr, step_size_up=50, step_size_down=50)
+    else:
+        raise ValueError('lr name error!please check!')
+
+    # set up metrics
+    metrics = MtssMetrics(num_classes)
+
+    # starting params
+    best_loss = 999
+    best_acc = 0
+    best_iou = 0
+
+    if ckpt_path:
+        if ckpt_path.is_file():
+            print("=> loading checkpoint '{}'".format(ckpt_path))
+            checkpoint = torch.load(ckpt_path)
+            if checkpoint['epoch'] > start_epoch:
+                start_epoch = checkpoint['epoch']
+
+            best_loss = checkpoint['best_loss']
+            best_acc = checkpoint['best_acc']
+            model.load_state_dict(checkpoint["state_dict"])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            print("=> loaded checkpoint '{}' (epoch {})".format(ckpt_path, checkpoint['epoch']))
+        else:
+            print("=> no checkpoint found at '{}'".format(ckpt_path))
+
+    # set up dataloader
+    # load data
+    train_dst, val_dst = get_dataset(data_root, crop_size)
+    train_loader = data.DataLoader(
+        train_dst, batch_size=train_batchsize, shuffle=True, num_workers=2, drop_last=True)
+    val_loader = data.DataLoader(
+        val_dst, batch_size=val_batchsize, shuffle=True, num_workers=2, drop_last=True)
+    print("Dataset: Train set: %d, Val set: %d" %
+          (len(train_dst), len(val_dst)))
+
+    logger = {'vis': vis, 'print_freq': print_freq}
+
+    # ----------------------------------------train Loop---------------------------------- #
     vis_sample_id = np.random.randint(0, len(val_loader), vis_num_samples,
-                                        np.int32) if enable_vis else None
+                                      np.int32) if enable_vis else None
 
-    interval_loss = 0
-    while True: # cur_itrs < total_itrs:
-        model.train()
-        cur_epochs += 1
-        for (images, dems, labels) in train_loader:
-            cur_itrs += 1
+    for epoch in range(start_epoch, epochs):
+        print('Epoch {}/{}'.format(epoch, epochs - 1))
+        print('-' * 10)
 
-            images = images.to(device, dtype=torch.float32)
-            dems = dems.to(device, dtype=torch.float32)
-            labels = labels.to(device, dtype=torch.long)
+        # run training
+        train_score = train(train_loader, model, model_name, optimizer, lr_scheduler, criterion, metrics, logger, epoch)
+        val_score = validate(val_loader, model, model_name, criterion, metrics, logger, epoch)
 
-            optimizer.zero_grad()
-            if model_name[:4] == 'mtss':
-                outputs = model(images, dems)
-            else:
-                images = torch.cat((images, dems), 1)
-                outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+        # is_best_loss = val_score['Loss'] < best_loss
+        # is_best_acc = val_score['Overall Acc'] > best_acc
+        is_best_iou = val_score['Mean IoU'] > best_iou
 
-            np_loss = loss.detach().cpu().numpy()
-            interval_loss += np_loss
-            if vis is not None:
-                vis.vis_scalar('Loss', cur_itrs, np_loss)
-             
-            if (cur_itrs) % 10 == 0:
-                interval_loss = interval_loss / 10
-                print("Epoch %d, Itrs %d/%d, Loss=%.4f" %
-                      (cur_epochs, cur_itrs, total_itrs, interval_loss))
-                interval_loss = 0.0
-                
-            if (cur_itrs) % val_interval == 0:
-                print("validation...")
-                model.eval()
-                val_score, ret_samples = validate(
-                        model_name=model_name, model=model, loader=val_loader, device=device, metrics=metrics, ret_samples_ids=vis_sample_id)
-                print(metrics.to_str(val_score))
+        best_loss = min(val_score['Loss'], best_loss)
+        best_acc = max(val_score['Overall Acc'], best_acc)
+        best_iou - max(val_score['Mean IoU'], best_iou)
+        sv_name = "{}-loss_{:.4f}-Acc_{:.4f}-IoU_{:.4f}-Epoch_{}".format(
+                    model_name, val_score['Loss'], val_score['Overall Acc'], val_score['Mean IoU'], epoch)
+        if is_best_iou:
+            # print('saving loss best model')
+            save_checkpoint({
+                'epoch': epoch,
+                'arch': model,
+                'state_dict': model.state_dict(),
+                'best_loss': best_loss,
+                'best_acc': best_acc,
+                'best_iou': best_iou,
+                'optimizer': optimizer.state_dict()
+            }, is_best_iou, sv_name)
+        else:
+            # print('saving accuracy best model')
+            save_checkpoint({
+                'epoch': epoch,
+                'arch': model,
+                'state_dict': model.state_dict(),
+                'best_loss': best_loss,
+                'best_acc': best_acc,
+                'best_iou': best_iou,
+                'optimizer': optimizer.state_dict()
+            }, is_best_iou, sv_name)
 
-                if val_score['Mean IoU'] > best_score:  # save best model
-                    best_score = val_score['Mean IoU']
-                    save_ckpt('checkpoints/mtss/best_%s-Score%.4f-Epoch%d-Iters%d-Total_Loss%.4f.pth' %
-                          (model_name, best_score, cur_epochs, cur_itrs, interval_loss))
-                # else:
-                #     save_ckpt('checkpoints/villageLand/latest_%s-Score%.4f-Epoch%d-Iters%d-Total_Loss%.4f.pth' %
-                #           (model_name, cur_score, cur_epochs, cur_itrs, interval_loss))
 
-                if vis is not None:  # visualize validation score and samples
-                    vis.vis_scalar("[Val] Overall Acc", cur_itrs, val_score['Overall Acc'])
-                    vis.vis_scalar("[Val] Mean IoU", cur_itrs, val_score['Mean IoU'])
-                    vis.vis_table("[Val] Class IoU", val_score['Class IoU'])
-                if training_log == True:
-                    file_handle = open('./train/logs/trainLog_villageLand.txt', mode='a+')
-                    file_handle.writelines([
-                    '*------------------------------------------------*\n'
-                    'The prediction of model %s\n' %(model_name),
-                    'Epoch: %d\n' %(cur_epochs),
-                    'Itrs %d/%d\n' %(cur_itrs, total_itrs),
-                    'Total_Loss_%f\n' %(interval_loss),
-                    metrics.to_str(val_score)
-                    ])
-                    file_handle.close()
-                model.train()
-            scheduler.step()
-            if cur_itrs >=  total_itrs:
-                return
+def train(train_loader, model, model_name, optimizer, lr_scheduler, criterion, metrics, logger, epoch_num):
+    # reset scheduler
+    metrics.reset()
+    log_iter = len(train_loader) // logger['print_freq']
+    resigual = len(train_loader) % logger['print_freq']
+    model.train()
+    # iterate over data
+    for idx, img_data in enumerate(tqdm(train_loader)):
+        train_metrics = make_train_step(img_data, model, model_name, optimizer, criterion, metrics)
+        # if cyclic_lr
+        lr_scheduler.step()
+        if idx and idx % log_iter == 0:
+            step = (epoch_num * (logger['print_freq']+resigual)) + (idx / log_iter)
+            score = train_metrics.get_results()
+            # log accurate and loss
+            info = {
+                'Train Loss': score["Loss"],
+                'Train Overall Acc': score["Overall Acc"],
+                'Train Class IoU': score["Class IoU"],
+                'Train Mean IoU': score['Mean IoU']
+            }
+            for tag, value in info.items():
+                logger['vis'].vis_scalar(tag, step, value)
+    # summary
+    score = metrics.get_results()
+    # if step_lr
+    # lr_scheduler.step()
+    print('Training Loss: {:.4f} Overall Acc: {:.4f} Mean IoU: {:.4f} '.format(
+        score["Loss"], score["Overall Acc"], score['Mean IoU']))
+    print()
+    return score
+
+
+def make_train_step(img_data, model, model_name, optimizer, criterion, metrics):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    images = img_data[0].to(device, dtype=torch.float32)
+    dems = img_data[1].to(device, dtype=torch.float32)
+    labels = img_data[2].to(device, dtype=torch.long)
+    # zero the parameter gradients
+    optimizer.zero_grad()
+    if model_name[:4] == 'mtss':
+        outputs = model(images, dems)
+    else:
+        images = torch.cat((images, dems), 1)
+        outputs = model(images)
+
+    loss = criterion(outputs, labels)
+
+    # backward
+    loss.backward()
+    optimizer.step()
+
+    preds = outputs.detach().max(dim=1)[1].cpu().numpy()
+    targets = labels.cpu().numpy()
+    metrics.update(targets, preds, loss)
+    return metrics
+
+
+def validate(valid_loader, model, model_name, criterion, meters, logger, epoch_num):
+    
+    log_iter = len(valid_loader) // logger['print_freq']
+    residual = (len(valid_loader) % logger['print_freq']) // log_iter
+    # reset metrics
+    meters.reset()
+    
+    model.eval()
+    # Iterate over Data
+    for idx, img_data in enumerate(tqdm(valid_loader)):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        images = img_data[0].to(device, dtype=torch.float32)
+        dems = img_data[1].to(device, dtype=torch.float32)
+        labels = img_data[2].to(device, dtype=torch.long)
+        # forward
+        if model_name[:4] == 'mtss':
+            outputs = model(images, dems)
+        else:
+            images = torch.cat((images, dems), 1)
+            outputs = model(images)
+        # pay attention to the weighted loss should input logits not probs
+        loss = criterion(outputs, labels)
+
+        preds = outputs.detach().max(dim=1)[1].cpu().numpy()
+        targets = labels.cpu().numpy()
+        meters.update(targets, preds, loss)
+
+        # visdom logging
+
+        if idx and idx % log_iter == 0:
+            step = (epoch_num * (logger['print_freq']+residual)) + (idx / log_iter)
+            score = meters.get_results()
+            # log accuracy and loss
+            info = {
+                'Valid Loss': score["Loss"],
+                'Valid Overall Acc': score["Overall Acc"],
+                'Valid Class IoU': score["Class IoU"],
+                'Valid Mean IoU': score['Mean IoU']
+            }
+
+            for tag, value in info.items():
+                logger['vis'].vis_scalar(tag, step, value)
+
+    # summary
+    score = meters.get_results()
+    # logging
+    print('Valid Loss: {:.4f} Overall Acc: {:.4f} Mean IoU: {:.4f} '.format(
+        score["Loss"], score["Overall Acc"], score['Mean IoU']))
+    print()
+    return score
+
+
+def save_checkpoint(state, is_best, name):
+    """ save current model
+    """
+    checkpoint_dir = Path('./checkpoints/mtss')
+    if not checkpoint_dir.is_dir():
+        checkpoint_dir.mkdir()
+    filename = checkpoint_dir / (name + '.pth')
+    torch.save(state, filename)
+    if is_best:
+        filename_best = checkpoint_dir / ('best-' + name + '.pth')
+        filename_best.write_bytes(filename.read_bytes())
 
 
 if __name__ == '__main__':
-    train()
+    main()
