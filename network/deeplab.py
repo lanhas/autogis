@@ -5,7 +5,7 @@ from torch.nn import functional as F
 from .utils import _SimpleSegmentationModel
 
 
-__all__ = ["DeepLabV3"]
+__all__ = ["DeepLabV3", "DeepLabHeadV3Plus", ]
 
 
 class DeepLabV3(_SimpleSegmentationModel):
@@ -24,6 +24,8 @@ class DeepLabV3(_SimpleSegmentationModel):
         aux_classifier (nn.Module, optional): auxiliary classifier used during training
     """
     pass
+
+
 # ④
 class DeepLabHeadV3Plus(nn.Module):
     def __init__(self, in_channels, low_level_channels, num_classes, aspp_dilate=[12, 24, 36]):
@@ -59,6 +61,7 @@ class DeepLabHeadV3Plus(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
+
 class AtrousSeparableConvolution(nn.Module):
     """ Atrous Separable Convolution
     """
@@ -85,6 +88,7 @@ class AtrousSeparableConvolution(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
+
 class ASPPConv(nn.Sequential):
     def __init__(self, in_channels, out_channels, dilation):
         modules = [
@@ -93,6 +97,8 @@ class ASPPConv(nn.Sequential):
             nn.ReLU(inplace=True)
         ]
         super(ASPPConv, self).__init__(*modules)
+
+
 # ⑥
 class ASPPPooling(nn.Sequential):
     def __init__(self, in_channels, out_channels):
@@ -106,6 +112,8 @@ class ASPPPooling(nn.Sequential):
         size = x.shape[-2:]
         x = super(ASPPPooling, self).forward(x)
         return F.interpolate(x, size=size, mode='bilinear', align_corners=False)
+
+
 # ⑤
 class ASPP(nn.Module):
     def __init__(self, in_channels, atrous_rates):
@@ -139,7 +147,6 @@ class ASPP(nn.Module):
         return self.project(res)
 
 
-
 def convert_to_separable_conv(module):
     new_module = module
     if isinstance(module, nn.Conv2d) and module.kernel_size[0]>1:
@@ -153,6 +160,3 @@ def convert_to_separable_conv(module):
     for name, child in module.named_children():
         new_module.add_module(name, convert_to_separable_conv(child))
     return new_module
-
-if __name__ == "__main__":
-    net = DeepLabV3()

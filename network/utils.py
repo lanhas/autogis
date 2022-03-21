@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from collections import OrderedDict
 
+
 # 传统语义分割网络入口
 class _SimpleSegmentationModel(nn.Module):
     """
@@ -17,6 +18,7 @@ class _SimpleSegmentationModel(nn.Module):
         x = self.segmention(features)
         x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
         return x
+
 
 # 地理信息要素的多模态语义分割网络入口
 class _MultimodelSegmentationModel(nn.Module):
@@ -36,6 +38,7 @@ class _MultimodelSegmentationModel(nn.Module):
         x = self.segmention(features_rs, features_el)
         x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
         return x
+
 
 # 主干特征提取网络入口
 class IntermediateLayerGetter(nn.ModuleDict):

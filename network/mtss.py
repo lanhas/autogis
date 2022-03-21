@@ -3,7 +3,8 @@ from torch import nn
 from torch.nn import functional as F
 from network.utils import _MultimodelSegmentationModel
 
-__all__ = ["Mtss"]
+__all__ = ["Mtss", "MtssHead", "ElevationProcess", "convert_to_separable_conv"]
+
 
 class Mtss(_MultimodelSegmentationModel):
     """
@@ -30,6 +31,7 @@ class Mtss(_MultimodelSegmentationModel):
         segmentation (nn.Module): 将主干网络和高程网络进行特征融合从而进行分类
     """
     pass
+
 
 class MtssHead(nn.Module):
     def __init__(self, in_channels, low_level_channels, elvation_channels, num_classes, aspp_dilate=[12, 24, 36]):
@@ -71,6 +73,7 @@ class MtssHead(nn.Module):
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
+
 
 class ElevationProcess(nn.Module):
     """
@@ -121,6 +124,7 @@ class AtrousSeparableConvolution(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
+
 class ASPPConv(nn.Sequential):
     def __init__(self, in_channels, out_channels, dilation):
         modules = [
@@ -129,6 +133,7 @@ class ASPPConv(nn.Sequential):
             nn.ReLU(inplace=True)
         ]
         super(ASPPConv, self).__init__(*modules)
+
 
 class ASPPPooling(nn.Sequential):
     def __init__(self, in_channels, out_channels):
@@ -142,6 +147,7 @@ class ASPPPooling(nn.Sequential):
         size = x.shape[-2:]
         x = super(ASPPPooling, self).forward(x)
         return F.interpolate(x, size=size, mode='bilinear', align_corners=False)
+
 
 class ASPP(nn.Module):
     def __init__(self, in_channels, atrous_rates):
@@ -175,23 +181,16 @@ class ASPP(nn.Module):
         return self.project(res)
 
 
-
 def convert_to_separable_conv(module):
     new_module = module
     if isinstance(module, nn.Conv2d) and module.kernel_size[0]>1:
         new_module = AtrousSeparableConvolution(module.in_channels,
-                                      module.out_channels, 
-                                      module.kernel_size,
-                                      module.stride,
-                                      module.padding,
-                                      module.dilation,
-                                      module.bias)
+                                                module.out_channels,
+                                                module.kernel_size,
+                                                module.stride,
+                                                module.padding,
+                                                module.dilation,
+                                                module.bias)
     for name, child in module.named_children():
         new_module.add_module(name, convert_to_separable_conv(child))
     return new_module
-
-if __name__ == "__main__":
-    net = ElevationProcess()
-    data = torch.randn(1, 3, 512, 512)
-    output = net(data)
-    print(net)

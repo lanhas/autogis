@@ -6,6 +6,7 @@ from .mtvc import EmbeddingResNet, EmbeddingNet, SiameseNet, TripletNet, Classif
 from .backbone import mobilenetv2
 from .backbone import resnet
 
+
 def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_backbone):
     """
     基于resnet的语义分割
@@ -57,6 +58,7 @@ def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_bac
         model = Mtss(backbone, elevation, classifier_segm)
     return model
 
+
 def _segm_mobilenet(name, backbone, num_classes, output_stride, pretrained_backbone):
     """
     基于mobilenet的语义分割
@@ -101,7 +103,8 @@ def _segm_mobilenet(name, backbone, num_classes, output_stride, pretrained_backb
         classifier_segm = MtssHead(inplanes ,low_level_planes, elvational_planes, num_classes, aspp_dilate)
         model = Mtss(backbone, elevation, classifier_segm)
     return model
-    
+
+
 def _load_segmModel(arch_type, backbone, num_classes, output_stride, pretrained_backbone):
     """
     地理要素语义分割模型加载
@@ -133,6 +136,7 @@ def _load_segmModel(arch_type, backbone, num_classes, output_stride, pretrained_
             raise NotImplementedError
     return model
 
+
 def _load_ClasModel(arch_type, embedding_name, num_classes):
     """
     村落分类模型加载
@@ -159,6 +163,7 @@ def _load_ClasModel(arch_type, embedding_name, num_classes):
         raise ValueError("arch_type error!Please check and try again!")
     return model
 
+
 # Segmentation model
 # Mtss Baseline: Deeplab v3+
 def deeplabv3plus_resnet50(num_classes=7, output_stride=16, pretrained_backbone=True):
@@ -171,6 +176,7 @@ def deeplabv3plus_resnet50(num_classes=7, output_stride=16, pretrained_backbone=
     """
     return _load_segmModel('deeplabv3plus', 'resnet50', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
+
 def deeplabv3plus_resnet101(num_classes=7, output_stride=16, pretrained_backbone=True):
     """Constructs a DeepLabV3+ model with a ResNet-101 backbone.
 
@@ -181,6 +187,7 @@ def deeplabv3plus_resnet101(num_classes=7, output_stride=16, pretrained_backbone
     """
     return _load_segmModel('deeplabv3plus', 'resnet101', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
+
 def deeplabv3plus_mobilenet(num_classes=7, output_stride=16, pretrained_backbone=True):
     """Constructs a DeepLabV3+ model with a MobileNetv2 backbone.
 
@@ -190,6 +197,7 @@ def deeplabv3plus_mobilenet(num_classes=7, output_stride=16, pretrained_backbone
         pretrained_backbone (bool): If True, use the pretrained backbone.
     """
     return _load_segmModel('deeplabv3plus', 'mobilenetv2', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+
 
 # mtss
 def mtss_resnet50(num_classes=7, output_stride=16, pretrained_backbone=True):
@@ -202,6 +210,7 @@ def mtss_resnet50(num_classes=7, output_stride=16, pretrained_backbone=True):
     """
     return _load_segmModel('mtss', 'resnet50', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
+
 def mtss_resnet101(num_classes=7, output_stride=16, pretrained_backbone=True):
     """Constructs a Mtss model with a ResNet-101 backbone.
 
@@ -211,6 +220,7 @@ def mtss_resnet101(num_classes=7, output_stride=16, pretrained_backbone=True):
         pretrained_backbone (bool): If True, use the pretrained backbone.
     """
     return _load_segmModel('mtss', 'resnet101', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+
 
 def mtss_mobilenet(num_classes=7, output_stride=16, pretrained_backbone=True):
     """Constructs a Mtss model with a MobileNetv2 backbone.
@@ -222,34 +232,34 @@ def mtss_mobilenet(num_classes=7, output_stride=16, pretrained_backbone=True):
     """
     return _load_segmModel('mtss', 'mobilenetv2', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
+
 # Classification model
 # Mtvc Baseline: classification with softmax
 def classificationNet(embedding_name, num_classes=6):
     """Constructs a Mtvc classification with softmax"""
     return _load_ClasModel('classificationNet', embedding_name, num_classes=num_classes)
 
+
 # siamese
 def siameseNetwork(embedding_name, num_classes=6):
     """Constructs a Mtvc model with embedding Network"""
     return _load_ClasModel('siameseNetwork', embedding_name, num_classes=num_classes)
+
 
 # triplet
 def tripletNetwork(embedding_name, num_classes=6):
     """Constructs a Mtvc model with embedding Network"""
     return _load_ClasModel('tripletNetwork', embedding_name, num_classes=num_classes)
 
+
 # onlinePairSelection
 def onlinePairSelection(embedding_name, num_classes=6):
     """Constructs a Mtvc model with embedding Network"""
     return _load_ClasModel('onlinePairSelection', embedding_name, num_classes=num_classes)
+
 
 # onlineTripletSelection
 def onlineTripletSelection(embedding_name, num_classes=6):
     """Constructs a Mtvc model with embedding Network"""
     return _load_ClasModel('onlineTripletSelection', embedding_name, num_classes=num_classes)
 
-if __name__ == "__main__":
-    import torch
-    a = torch.rand(1, 3, 224, 224)
-    net = deeplabv3plus_mobilenet(7, 16, False)
-    print(net)
