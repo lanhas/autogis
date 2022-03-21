@@ -84,7 +84,6 @@ def cal_normpara(root_path, image_set):
     print("{}_std_dem:{}".format(image_set, std_dem))
 
 
-
 def extrate_img(file_path, source_paths, target_paths):
     """
     根据val.txt文件中的内容，将jpeg，dem和label文件提取到testSet中

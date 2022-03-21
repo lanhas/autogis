@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
+
 class FocalLoss(nn.Module):
     def __init__(self, alpha=1, gamma=0, size_average=True, ignore_index=255):
         super(FocalLoss, self).__init__()
@@ -19,6 +20,7 @@ class FocalLoss(nn.Module):
             return focal_loss.mean()
         else:
             return focal_loss.sum()
+
 
 class BCEDiceLoss(nn.Module):
     def __init__(self, penalty_weight=None, size_average=True):
@@ -69,6 +71,7 @@ class BCEDiceLoss(nn.Module):
 
 #         return loss, bce_loss, lovasz_loss.double()
 
+
 class ContrastiveLoss(nn.Module):
     """
     Contrastive loss
@@ -87,6 +90,7 @@ class ContrastiveLoss(nn.Module):
                         (1 + -1 * target).float() * F.relu(self.margin - (distances + self.eps).sqrt()).pow(2))
         return losses.mean() if size_average else losses.sum()
 
+
 class TripletLoss(nn.Module):
     """
     Triplet loss
@@ -102,6 +106,7 @@ class TripletLoss(nn.Module):
         distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
         losses = F.relu(distance_positive - distance_negative + self.margin)
         return losses.mean() if size_average is not None else losses.sum()
+
 
 class OnlineContrastiveLoss(nn.Module):
     """
@@ -128,6 +133,7 @@ class OnlineContrastiveLoss(nn.Module):
         loss = torch.cat([positive_loss, negative_loss], dim=0)
         return loss.mean()
 
+
 class OnlineTripletLoss(nn.Module):
     """
     Online Triplets loss
@@ -153,6 +159,3 @@ class OnlineTripletLoss(nn.Module):
         losses = F.relu(ap_distances - an_distances + self.margin)
 
         return losses.mean(), len(triplets)
-
-
-

@@ -1,5 +1,6 @@
 from visdom import Visdom
 
+
 class Visualizer(object):
     """Visualizer
     """
@@ -9,18 +10,21 @@ class Visualizer(object):
         self.env = env
 
     def vis_scalar(self, name, x, y, opts=None):
-        if not isinstance(x, list):
-            x = [x]
-        if not isinstance(y, list):
-            y = [y]
-        
-        if self.id is not None:
-            name = "[%s"%self.id + name
-        default_opts = { 'title': name}
-        if opts is not None:
-            default_opts.update(opts)
-
-        self.vis.line(X=x, Y=y, win=name, opts=default_opts, update='append')
+        if name[-9:] == 'Class IoU':
+            y = list(y.values())
+            legend_name = ['unknow', 'mountain', 'forest', 'farm', 'water', 'wasteland', 'village']
+            self.vis.line(X=[x], Y=[y], win=name, opts=dict(legend=legend_name), update='append')
+        else:
+            if not isinstance(x, list):
+                x = [x]
+            if not isinstance(y, list):
+                y = [y]
+            if self.id is not None:
+                name = "[%s" % self.id + name
+            default_opts = {'title': name}
+            if opts is not None:
+                default_opts.update(opts)
+            self.vis.line(X=x, Y=y, win=name, opts=default_opts, update='append')
 
     def vis_image(self, name, img, env=None, opts=None):
         """ vis image in visdom

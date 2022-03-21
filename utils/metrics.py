@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.metrics import confusion_matrix
 
+
 class _Metric(object):
     def __init__(self):
         """ Overridden by subclasses """
@@ -26,6 +27,7 @@ class _Metric(object):
         """ Overridden by subclasses """
         raise NotImplementedError()
 
+
 class MetricTracker(object):
     """Computes and stores the average and current value"""
     def __init__(self):
@@ -43,38 +45,6 @@ class MetricTracker(object):
         self.count += n
         self.avg = self.sum / self.count
 
-class RoadMetrics(_Metric):
-    def __init__(self):
-        """ Overridden by subclasses """
-        train_acc = MetricTracker()
-        train_loss = MetricTracker()
-        train_IoU = MetricTracker()
-        train_BCE = MetricTracker()
-        train_DICE = MetricTracker()
-        self.metrics = {"train_acc": train_acc, "train_loss": train_loss, 
-              "train_IoU": train_IoU, "train_BCE": train_BCE, 
-              "train_DICE": train_DICE, "outputs": None}
-
-    def __call__(self, outputs, target, loss):
-        """ Overridden by subclasses """
-        raise NotImplementedError()
-
-    def reset(self):
-        """ Overridden by subclasses """
-        raise NotImplementedError()
-
-    def value(self):
-        """ Overridden by subclasses """
-        raise NotImplementedError
-
-    def name(self):
-        """ Overridden by subclasses """
-        raise NotImplementedError
-
-    def to_str(self, metrics):
-        """ Overridden by subclasses """
-        raise NotImplementedError()
-    
 
 class MtssMetrics(_Metric):
     """
@@ -83,19 +53,21 @@ class MtssMetrics(_Metric):
     def __init__(self, n_classes):
         self.n_classes = n_classes
         self.confusion_matrix = np.zeros((n_classes, n_classes))
+        self.loss_meters = MetricTracker()
 
-    def update(self, label_trues, label_preds):
+    def update(self, label_trues, label_preds, loss):
         for lt, lp in zip(label_trues, label_preds):
-            self.confusion_matrix += self._fast_hist( lt.flatten(), lp.flatten())
+            self.confusion_matrix += self._fast_hist(lt.flatten(), lp.flatten())
+        self.loss_meters.update(loss.item(), label_preds.shape[0])
 
-    
+
     @staticmethod
     def to_str(results):
         string = "\n"
         for k, v in results.items():
             if k!="Class IoU":
                 string += "%s: %f\n"%(k, v)
-        
+
         #string+='Class IoU:\n'
         #for k, v in results['Class IoU'].items():
         #    string += "\tclass %d: %f\n"%(k, v)
@@ -125,17 +97,21 @@ class MtssMetrics(_Metric):
         freq = hist.sum(axis=1) / hist.sum()
         fwavacc = (freq[freq > 0] * iu[freq > 0]).sum()
         cls_iu = dict(zip(range(self.n_classes), iu))
+        loss = self.loss_meters.avg
 
         return {
+                "Loss": loss,
                 "Overall Acc": acc,
                 "Mean Acc": acc_cls,
                 "FreqW Acc": fwavacc,
                 "Mean IoU": mean_iu,
                 "Class IoU": cls_iu,
             }
-        
+
     def reset(self):
         self.confusion_matrix = np.zeros((self.n_classes, self.n_classes))
+        self.loss_meters.reset()
+
 
 class AverageMtssMeter(object):
     """Computes average values"""
@@ -164,8 +140,10 @@ class AverageMtssMeter(object):
         assert record is not None
         return record[0] / record[1]
 
+
 def MtvcMetrics():
     return (AccumulatedAccuracyMetric(), AverageNonzeroTripletsMetric())
+
 
 class AccumulatedAccuracyMetric(_Metric):
     """
@@ -214,3 +192,38 @@ class AverageNonzeroTripletsMetric(_Metric):
     def name(self):
         return 'Average nonzero triplets'
 
+
+# https://stackoverflow.com/questions/48260415/pytorch-how-to-compute-iou-jaccard-index-for-semantic-segmentation
+# https://github.com/ternaus/robot-surgery-segmentation/blob/master/evaluate.py
+def jaccard_index(input, target):
+    """IoU calculation """
+    num_in_target = input.size(0)
+
+    pred = input.view(num_in_target, -1)
+    truth = target.view(num_in_target, -1)
+
+    # intersection = (pred*truth).long().sum(1).data.cpu()[0]
+    intersection = (pred * truth).sum(1)
+
+    # union = input.long().sum().data.cpu()[0] + target.long().sum().data.cpu()[0] - intersection
+    union = pred.sum(1) + truth.sum(1) - intersection
+
+    score = (intersection + 1e-15) / (union + 1e-15)
+
+    return score.mean().item()
+
+
+# https://github.com/pytorch/pytorch/issues/1249
+def dice_coeff(input, target):
+    num_in_target = input.size(0)
+
+    smooth = 1.
+
+    pred = input.view(num_in_target, -1)
+    truth = target.view(num_in_target, -1)
+
+    intersection = (pred * truth).sum(1)
+
+    loss = (2. * intersection + smooth) /(pred.sum(1) + truth.sum(1) + smooth)
+
+    return loss.mean().item()
