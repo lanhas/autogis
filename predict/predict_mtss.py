@@ -1,13 +1,10 @@
-import os
-import utils
 import torch
 import network
-import torch.nn as nn
+import numpy as np
 from tqdm import tqdm
 from PIL import Image
 from pathlib import Path
 from datasets.mtsd import villageFactorsSegm
-from torchvision import transforms as T
 
 # -----------------------------------------------------------------#
 #                     mask color                                   #
@@ -21,48 +18,26 @@ from torchvision import transforms as T
 #       村落        浅蓝色          0      128      128     6       #
 #------------------------------------------------------------------#
 
-ckpt = Path.cwd() / 'checkpoints/mtss/mtss_resnet50.pth'     # resume from checkpoint
-mode = 'predict'        # choice = ['test', 'predict', 'video']
-fixPredict = False
-inputImg = Path.cwd() / 'datasets/mtsd_voc/JPEGImages/bagui.jpg'      # This takes effect when the selected mode is 'predict'
-inputDem = Path.cwd() / 'datasets/mtsd_voc/DEMImages/bagui.jpg'      # This takes effect when the selected mode is 'predict'
 
-# This takes effect when the selected mode is 'test'
-val_file = Path.cwd() / 'datasets/mtsd_voc/ImageSets/Segmentation/val.txt'       # path to a single image or image director
-res_path = Path.cwd() / 'datasets/result'     # save segmentation results to the specified dir
+def main():
+    model_name = 'mtss_resnet50'
+    ckpt = Path(r'checkpoints/mtss/best-mtss_resnet50-loss_0.2928-Acc_0.9008-IoU_0.7003-Epoch_42.pth')
+    remote_data = Path(r'F:\Dataset\tradition_villages_old\Segmentation\JPEGImages')
+    dem_data = Path(r'F:\Dataset\tradition_villages_old\Segmentation\DEMImages')
+    save_dir = Path(r'F:\Dataset\results\tradition_villages_old')
 
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cpu'
 
-def predict():
-    #--------------------------------#
-    #-----------超参数----------------#
-    #--------------------------------#
-    # Network Options
-    # model_name = 'deeplabv3plus_resnet50'
-    model_name = 'mtss_resnet50'      # choices=['mtss_resnet50', 'mtss_resnet101',
-                                                # 'mtss_mobilenet', 'deeplabv3plus_resnet50']
-                                                # 'deeplabv3plus_resnet101', 'deeplabv3plus_mobilenet']
-    separable_conv = False      # apply separable conv to decoder and aspp
-    resize = -1
+    separable_conv = False  # apply separable conv to decoder and aspp
+    batch_size = 1
+    crop_size = 960
+    patch_size = 1024
     output_stride = 16      # choices=[8, 16]
     num_classes = 7
+    img_size = 2448
 
-    # predict
-    decode_fn = villageFactorsSegm.decode_target
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print("Device: %s" % device)
-
-    # Setup Dataloader
-    if mode == 'test':
-        with open(val_file, "r") as f:
-            file_names = [x.strip() for x in f.readlines()]
-        image_files = [Path.cwd() / 'datasets/mtsd_voc/JPEGImages' / (x + '.jpg') for x in file_names]
-        dem_files = [Path.cwd() / 'datasets/mtsd_voc/DEMImages' / (x + '.jpg') for x in file_names]
-    else:
-        image_files = [inputImg]
-        dem_files = [inputDem]
-
-    # Setup model
+    # setup model
     model_map = {
         'mtss_resnet50': network.mtss_resnet50,
         'mtss_resnet101': network.mtss_resnet101,
@@ -71,101 +46,112 @@ def predict():
         'deeplabv3plus_resnet101': network.deeplabv3plus_resnet101,
         'deeplabv3plus_mobilenet': network.deeplabv3plus_mobilenet
     }
-    model = model_map[model_name](num_classes=num_classes, output_stride=output_stride)
+
+    model = model_map[model_name](num_classes=num_classes, output_stride=output_stride).to(device)
     if separable_conv:
         network.convert_to_separable_conv(model.classifier)
-    utils.set_bn_momentum(model.backbone, momentum=0.01)
 
-    if ckpt is not None and os.path.isfile(ckpt):
-        checkpoint = torch.load(ckpt, map_location=torch.device('cpu'))
-        model.load_state_dict(checkpoint["model_state"], False)
-        model = nn.DataParallel(model)
-        model.to(device)
-        print("Resume model from %s" % ckpt)
-        del checkpoint
+    if ckpt.is_file():
+        print("=> loading checkpoint '{}".format(ckpt))
+        checkpoint = torch.load(ckpt)
+        model.load_state_dict(checkpoint["state_dict"], False)
     else:
-        print("[!] Retrain")
-        model = nn.DataParallel(model)
-        model.to(device)
+        print("=> no checkpoint found at '{}'".format(ckpt))
 
-    transform_remote = T.Compose([
-                T.ToTensor(),
-                T.Normalize(mean=[0.2737, 0.3910, 0.3276],
-                            std=[0.1801, 0.1560, 0.1301]),
-            ])
-    transform_dem = T.Compose([
-                T.ToTensor(),
-                T.Normalize(mean=[0.4153],
-                            std=[0.2405]),
-            ])
-    if res_path is not None:
-        os.makedirs(res_path, exist_ok=True)
+    # decode function
+    decode_fn = villageFactorsSegm.decode_target
 
-    def single_predict(image, dem):
-        img = transform_remote(image.resize((512, 512))).unsqueeze(0) # To tensor of NCHW
-        img = img.to(device)
-        dem_ori = Image.open(dem_path).convert('L').resize((512, 512))
-        dem = transform_dem(dem_ori).unsqueeze(0) # To tensor of NCHW
-        if model_name[:4] == 'mtss':
-            # 处理高程数据
-            dem = dem.to(device)
-            if model_name[:4] == 'mtss':
-                pred = model(img, dem).max(1)[1].cpu().numpy()[0] # HW
-            else:
-                img = torch.cat((img, dem), 1)
-                pred = model(img).max(1)[1].cpu().numpy()[0] # HW
-        else:
-            pred = model(img).max(1)[1].cpu().numpy()[0]
-        # 解码
-        colorized_preds = decode_fn(pred).astype('uint8')
-        result = segm_adjust(colorized_preds, dem_ori)
-        result = Image.fromarray(result)
-        return result
+    check_base_name = ckpt.stem
+    save_subdir = save_dir / check_base_name
+    if not save_subdir.is_dir():
+        save_subdir.mkdir()
 
-    def fix_predict(image, dem, multiple):
-        single_width = image.width // multiple
-        single_height = image.height // multiple
-        boxes = [[(i*single_width, j*single_height, (i+1)*single_width, (j+1)*single_height) for j in range(multiple)] for i in range(multiple)]
-        images = [image.crop(box) for box in boxes]
-        dems = [dem.crop(box) for box in boxes]
-        results = [single_predict(image, dem) for (image, dem) in zip(images, dems)]
-        result = concat_images(results, (single_width, single_height), multiple)
-        return result
+    model.eval()
+    if remote_data.is_dir() and dem_data.is_dir():
+        file_names_remote = list(filter(lambda x: x.suffix == '.jpg', remote_data.iterdir()))
+        file_names_dem = list(filter(lambda x: x.suffix == '.jpg', dem_data.iterdir()))
+        if not len(file_names_remote) == len(file_names_dem):
+            raise ValueError("data error!")
+    elif remote_data.is_file() and dem_data.is_file():
+        file_names_remote = [remote_data]
+        file_names_dem = [dem_data]
+    else:
+        raise ValueError('data path error! please check!')
 
-    with torch.no_grad():
-        model = model.eval()
-        for img_path, dem_path in tqdm(zip(image_files, dem_files)):
-            if not img_path.stem == dem_path.stem:
-                raise ValueError("遥感数据与dem数据不对应，请检查后重试！")
-            # 处理遥感数据
-            img = Image.open(img_path).convert('RGB')
-            dem = Image.open(dem_path).convert('L')
-            if fixPredict:
-                result = fix_predict(img, dem, 5)
-            else:
-                result = single_predict(img, dem)
-            result.show()
-            if res_path:
-                result.save(res_path / (img_path.stem+'.png'))
+    # setup stride
+    stride = int(crop_size / 2)
+    stride_idx = list(range(0, img_size, stride))
+    miro_margin = int((patch_size - crop_size) / 2)
+    batch_num = len(file_names_remote) // batch_size + 1
 
+    for batch_idx in tqdm(range(0, batch_num)):
+        batch_remote_path_list = file_names_remote[batch_idx*batch_size:(batch_idx+1)*batch_size]
+        batch_dem_path_list = file_names_dem[batch_idx * batch_size:(batch_idx + 1) * batch_size]
 
-def concat_images(images, size, multiple):
-    target = Image.new('RGB', (size[0] * multiple, size[1] * multiple))
-    for row in range(multiple):
-        for col in range(multiple):
-            #对图片进行逐行拼接
-            #paste方法第一个参数指定需要拼接的图片，第二个参数为二元元组（指定复制位置的左上角坐标）
-            #或四元元组（指定复制位置的左上角和右下角坐标）
-            target.paste(images[multiple*row+col], (0 + size[0]*col, 0 + size[1]*row))
-    return target
+        batch_remote_list = [np.array(Image.open(path)) for path in batch_remote_path_list]
+        batch_remote_array = np.array(batch_remote_list)
 
+        batch_dem_list = [np.array(Image.open(path)) for path in batch_dem_path_list]
+        batch_dem_array = np.expand_dims(np.array(batch_dem_list), 3)
 
-def segm_adjust(image, dem):
-    """
-    根据dem数据对分割结果进行调整
-    """
-    return image
+        batch_predict_test_maps = np.zeros((len(batch_remote_path_list), img_size, img_size))
+        predict_test_mask = np.zeros((img_size, img_size))
+
+        test_remote_miro_array = np.pad(batch_remote_array, pad_width=[(0, 0),
+                                        (miro_margin, miro_margin),
+                                        (miro_margin, miro_margin),
+                                        (0, 0)], mode='reflect')
+        test_dem_miro_array = np.pad(batch_dem_array, pad_width=[(0, 0),
+                                     (miro_margin, miro_margin),
+                                     (miro_margin, miro_margin),
+                                     (0, 0)], mode='reflect')
+        assert test_remote_miro_array.shape[1:] == (img_size + (patch_size - crop_size),
+                                                    img_size + (patch_size - crop_size),
+                                                    3)
+        for i, start_row in enumerate(stride_idx):
+            for j, start_col in enumerate(stride_idx):
+                batch_temp_test_maps = np.zeros((len(batch_remote_path_list), img_size, img_size))
+                temp_test_mask = np.zeros((img_size, img_size))
+                if start_row + crop_size > img_size:
+                    start_row = img_size - crop_size
+                if start_col + crop_size > img_size:
+                    start_col = img_size - crop_size
+
+                batch_crop_test_remote = test_remote_miro_array[:, start_row:start_row + patch_size,
+                                                                start_col:start_col + patch_size, :]
+                batch_crop_test_dem = test_dem_miro_array[:, start_row:start_row + patch_size,
+                                                          start_col:start_col + patch_size, :]
+
+                batch_crop_test_remote = torch.Tensor(np.transpose(batch_crop_test_remote, axes=(0, 3, 1, 2)) / 255.0).to(device)
+                batch_crop_test_dem = torch.Tensor(np.transpose(batch_crop_test_dem, axes=(0, 3, 1, 2)) / 255.0).to(device)
+
+                if model_name[:4] == 'mtss':
+                    output_logist = model(batch_crop_test_remote, batch_crop_test_dem).max(1)[1]
+                else:
+                    batch_imgs = torch.cat((batch_crop_test_remote, batch_crop_test_dem), 1)
+                    output_logist = model(batch_imgs).max(1)[1]
+                outputs_maps = output_logist.cpu().numpy()
+                outputs_maps_crops = outputs_maps[:, miro_margin:miro_margin + crop_size,
+                                               miro_margin:miro_margin + crop_size]
+
+                batch_temp_test_maps[:, start_row:start_row + crop_size,
+                                     start_col:start_col + crop_size] = outputs_maps_crops
+                temp_test_mask[start_row:start_row+crop_size,
+                               start_col:start_col+crop_size] = np.ones((crop_size, crop_size))
+
+                batch_predict_test_maps = batch_predict_test_maps + batch_temp_test_maps
+                predict_test_mask = predict_test_mask + temp_test_mask
+
+        predict_test_mask = np.expand_dims(predict_test_mask, axis=0)
+        batch_predict_test_maps = batch_predict_test_maps / predict_test_mask
+
+        for img_idx, img_path in enumerate(batch_remote_path_list):
+            save_path = save_subdir / img_path.name
+            colorized_predict = decode_fn(batch_predict_test_maps[img_idx, :].astype('uint8'))
+            Image.fromarray(colorized_predict).save(save_path)
+            print('saved predicted image {}'.format(img_path.name))
 
 
 if __name__ == "__main__":
-    predict()
+    main()
+

@@ -61,8 +61,8 @@ def main():
     weight_decay = 1e-4
     step_size = 12
 
-    train_batchsize = 2
-    val_batchsize = 2
+    train_batch_size = 2
+    valid_batch_size = 2
     crop_size = 256
     loss_type = 'cross_entropy'  # choices=['cross_entropy', 'focal_loss']
     data_root = Path(r'F:\Dataset\tradition_villages1\Segmentation')
@@ -145,9 +145,9 @@ def main():
     # load data
     train_dst, val_dst = get_dataset(data_root, crop_size)
     train_loader = data.DataLoader(
-        train_dst, batch_size=train_batchsize, shuffle=True, num_workers=2, drop_last=True)
+        train_dst, batch_size=train_batch_size, shuffle=True, num_workers=2, drop_last=True)
     val_loader = data.DataLoader(
-        val_dst, batch_size=val_batchsize, shuffle=True, num_workers=2, drop_last=True)
+        val_dst, batch_size=valid_batch_size, shuffle=True, num_workers=2, drop_last=True)
     print("Dataset: Train set: %d, Val set: %d" %
           (len(train_dst), len(val_dst)))
 
