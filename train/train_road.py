@@ -2,12 +2,12 @@ import os
 import torch
 import numpy as np
 import torch.nn as nn
+from copy import deepcopy
 from utils import metrics
 from network.unet import UNet, UNetSmall
 from torch.utils import data
 from datasets.road import RoadSegm
 from utils import ext_transforms as et
-from utils import losses
 from utils.visualizer import Visualizer
 from pathlib import Path
 from tqdm import tqdm
@@ -20,16 +20,10 @@ def get_dataset(data_root, crop_size=512):
             et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             et.ExtRandomHorizontalFlip(),
             et.ExtToTensor(),
-            # et.ExtNormalize(mean=[0.4100, 0.3831, 0.2886],
-            #                 std=[0.1562, 0.1268, 0.1228],
-            #                 ),
         ])
     val_transform = et.ExtCompose([
             et.ExtRandomCrop(size=(512, 512), pad_if_needed=True),
             et.ExtToTensor(),
-            # et.ExtNormalize(mean=[0.4075, 0.3807, 0.2848],
-            #                 std=[0.1569, 0.1256, 0.1210],
-            #                 ),
         ])
     train_dst = RoadSegm(root_dir=data_root, status='train', transform=train_transform)
     val_dst = RoadSegm(root_dir=data_root, status='valid', transform=val_transform)
@@ -42,10 +36,12 @@ def main():
     epochs = 75                 # number of total epochs to run (default: 75)
     ckpt_path = None            # path to latest checkpoint (default: none)
     enable_vis = True
+    hard_mining = True
     model_name = "unet_small"   # choose model for training (default: unet_small)
 
     # train
-    lr_policy = 'cyclic_lr'
+    # lr_policy = 'cyclic_lr'
+    lr_policy = 'step_lr'
     lr = 5e-4                   # initial learning rate (default: 1e-3)
     max_lr = 2e-3
     weight_decay = 1e-4         # weight decay of SGD optimizer,
@@ -54,7 +50,6 @@ def main():
     train_batch_size = 2         # mini-batch size (default: 128)
     valid_batch_size = 2
     crop_size = 256             # number of cropped pixels from orig image (default: 112)
-    # lovasz_loss = False
     data_root = Path(r'F:\Dataset\road dataset')  # path to dataset (parent dir of train and val)
 
     # visdom
@@ -84,6 +79,7 @@ def main():
 
     # setup optimizer
     optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=lr,)
 
     # decay LR
     if lr_policy == 'cyclic_lr':
@@ -133,7 +129,7 @@ def main():
         print('-' * 10)
 
         # run training and validation
-        train_score = train(train_loader, model, optimizer, lr_scheduler, criterion, logger, epoch)
+        train_score = train(train_loader, model, optimizer, lr_scheduler, criterion, logger, hard_mining, epoch)
         valid_score = validate(val_loader, model, criterion, logger, epoch)
 
         is_best_iou = valid_score['valid_IoU'] > best_iou
@@ -203,7 +199,7 @@ def make_train_step(img_data, model, optimizer, criterion, meters):
     return meters
 
 
-def train(train_loader, model, optimizer, lr_scheduler, criterion, logger, epoch_num):
+def train(train_loader, model, optimizer, lr_scheduler, criterion, logger, hard_mining, epoch_num):
 
     # logging accuracy and loss
     train_acc = metrics.MetricTracker()
@@ -217,12 +213,25 @@ def train(train_loader, model, optimizer, lr_scheduler, criterion, logger, epoch
     resigual = len(train_loader) % logger['print_freq']
     model.train()
 
+    cache = None
+    cached_loss = 0
+
     # iterate over data
     for idx, img_data in enumerate(tqdm(train_loader)):
         meters = make_train_step(img_data, model, optimizer, criterion, meters)
-        lr_scheduler.step()
-        # if idx and idx % log_iter == 0:
-        if idx:
+        # lr_scheduler.step()
+
+        # hard negative mining
+        if hard_mining:
+            if cache is None or cached_loss < meters['train_loss'].val:
+                cached_loss = meters['train_loss'].val
+                cache = deepcopy(img_data)
+            if idx % 50 == 0 and cache is not None:
+                meters = make_train_step(cache, model, optimizer, criterion, meters)
+                cache = None
+                cached_loss = 0
+
+        if idx % log_iter == 0:
             step = (epoch_num*(logger['print_freq'] + resigual))+idx
 
             # log accurate and loss
@@ -235,7 +244,7 @@ def train(train_loader, model, optimizer, lr_scheduler, criterion, logger, epoch
             for tag, value in info.items():
                 logger['vis'].vis_scalar(tag, step, value)
     # if step_lr
-    # lr_scheduler.step()
+    lr_scheduler.step()
     print('Training Loss: {:.4f} Acc: {:.4f} IoU: {:.4f} '.format(
             meters["train_loss"].avg, meters["train_acc"].avg, meters["train_IoU"].avg))
     print()

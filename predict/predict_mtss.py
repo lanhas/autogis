@@ -31,11 +31,12 @@ def main():
 
     separable_conv = False  # apply separable conv to decoder and aspp
     batch_size = 1
-    crop_size = 960
-    patch_size = 1024
+    crop_val = True
+    crop_size = 500
+    patch_size = 512
     output_stride = 16      # choices=[8, 16]
     num_classes = 7
-    img_size = 2448
+    img_size = (2448, 2448)
 
     # setup model
     model_map = {
@@ -78,14 +79,16 @@ def main():
     else:
         raise ValueError('data path error! please check!')
 
-    # setup stride
-    stride = int(crop_size / 2)
-    stride_idx = list(range(0, img_size, stride))
-    miro_margin = int((patch_size - crop_size) / 2)
     batch_num = len(file_names_remote) // batch_size + 1
 
+    # crop_val
+    stride = crop_size * 1
+    stride_idx_width = list(range(0, img_size[1], stride))
+    stride_idx_height = list(range(0, img_size[0], stride))
+    miro_margin = int((patch_size - crop_size) / 2)
+
     for batch_idx in tqdm(range(0, batch_num)):
-        batch_remote_path_list = file_names_remote[batch_idx*batch_size:(batch_idx+1)*batch_size]
+        batch_remote_path_list = file_names_remote[batch_idx * batch_size:(batch_idx + 1) * batch_size]
         batch_dem_path_list = file_names_dem[batch_idx * batch_size:(batch_idx + 1) * batch_size]
 
         batch_remote_list = [np.array(Image.open(path)) for path in batch_remote_path_list]
@@ -94,60 +97,63 @@ def main():
         batch_dem_list = [np.array(Image.open(path)) for path in batch_dem_path_list]
         batch_dem_array = np.expand_dims(np.array(batch_dem_list), 3)
 
-        batch_predict_test_maps = np.zeros((len(batch_remote_path_list), img_size, img_size))
-        predict_test_mask = np.zeros((img_size, img_size))
+        if not crop_val:
+            batch_remote_array = torch.Tensor(np.transpose(batch_remote_array,
+                                              axes=(0, 3, 1, 2)) / 255.0).to(device)
+            batch_dem_array = torch.Tensor(np.transpose(batch_dem_array,
+                                           axes=(0, 3, 1, 2)) / 255.0).to(device)
+            if model_name[:4] == 'mtss':
+                output_logist = model(batch_remote_array, batch_dem_array).max(1)[1]
+            else:
+                batch_imgs = torch.cat((batch_remote_array, batch_dem_array), 1)
+                output_logist = model(batch_imgs).max(1)[1]
+            outputs_maps = output_logist.cpu().numpy()
 
-        test_remote_miro_array = np.pad(batch_remote_array, pad_width=[(0, 0),
-                                        (miro_margin, miro_margin),
-                                        (miro_margin, miro_margin),
-                                        (0, 0)], mode='reflect')
-        test_dem_miro_array = np.pad(batch_dem_array, pad_width=[(0, 0),
-                                     (miro_margin, miro_margin),
-                                     (miro_margin, miro_margin),
-                                     (0, 0)], mode='reflect')
-        assert test_remote_miro_array.shape[1:] == (img_size + (patch_size - crop_size),
-                                                    img_size + (patch_size - crop_size),
-                                                    3)
-        for i, start_row in enumerate(stride_idx):
-            for j, start_col in enumerate(stride_idx):
-                batch_temp_test_maps = np.zeros((len(batch_remote_path_list), img_size, img_size))
-                temp_test_mask = np.zeros((img_size, img_size))
-                if start_row + crop_size > img_size:
-                    start_row = img_size - crop_size
-                if start_col + crop_size > img_size:
-                    start_col = img_size - crop_size
+        else:
+            batch_predict_test_maps = np.zeros((len(batch_remote_path_list), img_size[0], img_size[1]))
+            test_remote_miro_array = np.pad(batch_remote_array, pad_width=[(0, 0),
+                                            (miro_margin, miro_margin),
+                                            (miro_margin, miro_margin),
+                                            (0, 0)], mode='reflect')
 
-                batch_crop_test_remote = test_remote_miro_array[:, start_row:start_row + patch_size,
-                                                                start_col:start_col + patch_size, :]
-                batch_crop_test_dem = test_dem_miro_array[:, start_row:start_row + patch_size,
-                                                          start_col:start_col + patch_size, :]
+            test_dem_miro_array = np.pad(batch_dem_array, pad_width=[(0, 0),
+                                          (miro_margin, miro_margin),
+                                          (miro_margin, miro_margin),
+                                          (0, 0)], mode='reflect')
 
-                batch_crop_test_remote = torch.Tensor(np.transpose(batch_crop_test_remote, axes=(0, 3, 1, 2)) / 255.0).to(device)
-                batch_crop_test_dem = torch.Tensor(np.transpose(batch_crop_test_dem, axes=(0, 3, 1, 2)) / 255.0).to(device)
+            for i, start_row in enumerate(stride_idx_height):
+                for j, start_col in enumerate(stride_idx_height):
+                    if start_row + crop_size > img_size[0]:
+                        start_row = img_size[0] - crop_size
+                    if start_col + crop_size > img_size[1]:
+                        start_col = img_size[1] - crop_size
 
-                if model_name[:4] == 'mtss':
-                    output_logist = model(batch_crop_test_remote, batch_crop_test_dem).max(1)[1]
-                else:
-                    batch_imgs = torch.cat((batch_crop_test_remote, batch_crop_test_dem), 1)
-                    output_logist = model(batch_imgs).max(1)[1]
-                outputs_maps = output_logist.cpu().numpy()
-                outputs_maps_crops = outputs_maps[:, miro_margin:miro_margin + crop_size,
-                                               miro_margin:miro_margin + crop_size]
+                    batch_patch_test_remote = test_remote_miro_array[:, start_row:start_row + patch_size,
+                                                                     start_col:start_col + patch_size, :]
+                    batch_patch_test_dem = test_dem_miro_array[:, start_row:start_row + patch_size,
+                                                               start_col:start_col + patch_size, :]
 
-                batch_temp_test_maps[:, start_row:start_row + crop_size,
-                                     start_col:start_col + crop_size] = outputs_maps_crops
-                temp_test_mask[start_row:start_row+crop_size,
-                               start_col:start_col+crop_size] = np.ones((crop_size, crop_size))
+                    batch_patch_test_remote = torch.Tensor(np.transpose(batch_patch_test_remote,
+                                                                        axes=(0, 3, 1, 2)) / 255.0).to(device)
+                    batch_patch_test_dem = torch.Tensor(np.transpose(batch_patch_test_dem,
+                                                                     axes=(0, 3, 1, 2)) / 255.0).to(device)
 
-                batch_predict_test_maps = batch_predict_test_maps + batch_temp_test_maps
-                predict_test_mask = predict_test_mask + temp_test_mask
+                    if model_name[:4] == 'mtss':
+                        output_logist = model(batch_patch_test_remote, batch_patch_test_dem).max(1)[1]
+                    else:
+                        batch_imgs = torch.cat((batch_patch_test_remote, batch_patch_test_dem), 1)
+                        output_logist = model(batch_imgs).max(1)[1]
+                    outputs_maps_patch = output_logist.cpu().numpy()
+                    outputs_maps_crops = outputs_maps_patch[:, miro_margin:miro_margin + crop_size,
+                                                            miro_margin:miro_margin + crop_size]
 
-        predict_test_mask = np.expand_dims(predict_test_mask, axis=0)
-        batch_predict_test_maps = batch_predict_test_maps / predict_test_mask
+                    batch_predict_test_maps[:, start_row:start_row + crop_size,
+                                            start_col:start_col + crop_size] = outputs_maps_crops
+            outputs_maps = batch_predict_test_maps
 
         for img_idx, img_path in enumerate(batch_remote_path_list):
             save_path = save_subdir / img_path.name
-            colorized_predict = decode_fn(batch_predict_test_maps[img_idx, :].astype('uint8'))
+            colorized_predict = decode_fn(outputs_maps[img_idx, :].astype('uint8'))
             Image.fromarray(colorized_predict).save(save_path)
             print('saved predicted image {}'.format(img_path.name))
 

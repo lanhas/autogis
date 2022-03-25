@@ -3,7 +3,7 @@ import torch
 import os
 import numpy as np
 from torch.utils import data
-from DataSets.mtvcd import Mtvcd
+from datasets.mtvcd import Mtvcd
 import torchvision.transforms as T
 import matplotlib.pyplot as plt
 
@@ -64,10 +64,9 @@ def plot_embeddings(embeddings, targets, num_classes, xlim=None, ylim=None):
     plt.show()
 
 
-def test():
-    model_name = 'siameseNetwork'   # {'classificationNet', 'siameseNetwork',
-                                            #  'tripletNetwork', 'onlinePairSelection'
-                                            #  'onlineTripletSelection'}
+def main():
+    model_name = 'siameseNetwork'   # {'classificationNet', 'siameseNetwork','tripletNetwork',
+                                    # 'onlinePairSelection', 'onlineTripletSelection'}
     embedding_name = 'embeddingNet'  # {'embeddingNet', 'embeddingResNet'}
     crop_size = 512
     batch_size = 12
@@ -104,4 +103,4 @@ def test():
 
 
 if __name__ == "__main__":
-    test()
+    main()
