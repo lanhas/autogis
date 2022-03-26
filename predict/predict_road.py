@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def main():
-    model_name = 'unet_small'
+    model_name = 'dense_unet'
     ckpt = Path(r'checkpoints/mtss/best-mtss_resnet50-loss_0.2928-Acc_0.9008-IoU_0.7003-Epoch_42.pth')
     data_path = Path(r'F:\Dataset\tradition_villages_old\Segmentation\JPEGImages')
     save_dir = Path(r'F:\Dataset\results\tradition_villages_old')
@@ -88,7 +88,7 @@ def main():
                                                                     axes=(0, 3, 1, 2)) / 255.0).to(device)
 
                 output_maps = model(batch_patch_test_img)
-                output_maps = np.squeeze(output_maps.data.cpu().numpy(), dim=1)
+                output_maps = np.squeeze(output_maps.data.cpu().numpy())
 
                 outputs_maps_crops = output_maps[:, miro_margin:miro_margin + crop_size,
                                                  miro_margin:miro_margin + crop_size]
@@ -108,7 +108,7 @@ def main():
             save_path = save_subdir / img_path.name
             save_test_map = np.zeros(img_size)
             save_test_map[batch_predict_test_maps[img_idx, :] >= thres] = 255
-            Image.fromarray(save_test_map).save(save_path)
+            Image.fromarray(save_test_map.astype(np.uint8)).save(save_path)
             print('saved predicted image {}'.format(img_path.name))
 
 
