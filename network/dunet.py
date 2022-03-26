@@ -11,12 +11,12 @@ nonlinearity = partial(F.relu, inplace=True)
 class Dblock(nn.Module):
     def __init__(self, channel):
         super(Dblock, self).__init__()
-        self.dilate1 = nn.Conv2d(int(channel / 2), channel, 3, dilation=1, padding=1)
-        self.dilate2 = nn.Conv2d(channel, channel, 3, dilation=2, padding=2)
-        self.dilate3 = nn.Conv2d(channel, channel, 3, dilation=4, padding=4)
-        self.dilate4 = nn.Conv2d(channel, channel, 3, dilation=8, padding=8)
-        self.dilate5 = nn.Conv2d(channel, channel, 3, dilation=16, padding=16)
-        self.dilate6 = nn.Conv2d(channel, channel, 3, dilation=32, padding=32)
+        self.dilate1 = nn.Conv2d(channel / 2, channel, kernel_size=3, dilation=1, padding=1)
+        self.dilate2 = nn.Conv2d(channel, channel, kernel_size=3, dilation=2, padding=2)
+        self.dilate3 = nn.Conv2d(channel, channel, kernel_size=3, dilation=4, padding=4)
+        self.dilate4 = nn.Conv2d(channel, channel, kernel_size=3, dilation=8, padding=8)
+        self.dilate5 = nn.Conv2d(channel, channel, kernel_size=3, dilation=16, padding=16)
+        self.dilate6 = nn.Conv2d(channel, channel, kernel_size=3, dilation=32, padding=32)
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
                 if m.bias is not None:
@@ -34,7 +34,7 @@ class Dblock(nn.Module):
 
 
 class Dunet(nn.Module):
-    def __init__(self, num_classes=1):
+    def __init__(self):
         super(Dunet, self).__init__()
 
         vgg13 = models.vgg13(pretrained=True)
@@ -56,8 +56,10 @@ class Dunet(nn.Module):
         self.trans2 = self.upsample(256, 128)
         self.trans1 = self.upsample(128, 64)
 
-        # final
-        self.final = nn.Conv2d(64, num_classes, kernel_size=1)
+        self.conv_last = nn.Sequential(
+            nn.Conv2d(64, 1, 3, 1, 1),
+            nn.Sigmoid()
+        )
 
         self.max_pool = nn.MaxPool2d(2)
 
@@ -80,8 +82,8 @@ class Dunet(nn.Module):
             nn.ReLU(inplace=True)
         )
 
-    def forward(self, input):
-        stage1 = nonlinearity(self.conv2(nonlinearity(self.conv1(input))))
+    def forward(self, x):
+        stage1 = nonlinearity(self.conv2(nonlinearity(self.conv1(x))))
         stage2 = nonlinearity(self.conv4(nonlinearity(self.conv3(self.max_pool(stage1)))))
         stage3 = nonlinearity(self.conv6(nonlinearity(self.conv5(self.max_pool(stage2)))))
 
@@ -91,6 +93,6 @@ class Dunet(nn.Module):
         out = self.up2(torch.cat((self.trans2(out), stage2), 1))
         out = self.up1(torch.cat((self.trans1(out), stage1), 1))
 
-        # final
-        out = nn.functional.interpolate(self.final(out), input.size()[2:], mode='bilinear', align_corners=True)
+        out = self.conv_last(out)
+
         return out

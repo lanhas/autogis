@@ -79,8 +79,8 @@ def main():
     criterion = nn.BCELoss()
 
     # setup optimizer
-    optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
-    # optimizer = torch.optim.Adam(params=model.parameters(), lr=lr)
+    # optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=lr)
 
     # decay LR
     if lr_policy == 'cyclic_lr':
@@ -184,9 +184,8 @@ def make_train_step(img_data, model, optimizer, criterion, meters):
     labels = img_data[1].to(device, dtype=torch.float32)
     # zero the parameter gradients
     optimizer.zero_grad()
-    outputs = model(images)
+    outputs = model(images).squeeze(dim=1)
 
-    outputs = torch.sigmoid(outputs).squeeze(dim=1)
     loss = criterion(outputs, labels)
 
     # backward
@@ -270,9 +269,8 @@ def validate(valid_loader, model, criterion, logger, epoch_num):
         images = img_data[0].to(device, dtype=torch.float32)
         labels = img_data[1].to(device, dtype=torch.float32)
         # forward
-        outputs = model(images)
+        outputs = model(images).squeeze(dim=1)
 
-        outputs = torch.sigmoid(outputs).squeeze(dim=1)
         loss = criterion(outputs, labels)
         valid_acc.update(metrics.dice_coeff(outputs, labels), outputs.size(0))
         valid_loss.update(loss.item(), outputs.size(0))

@@ -160,7 +160,10 @@ class UNetSmall(nn.Module):
         self.decode1 = decoding_block(64, 32)
 
         # final
-        self.final = nn.Conv2d(32, num_classes, kernel_size=1)
+        self.final = nn.Sequential(
+            nn.Conv2d(32, num_classes, kernel_size=1),
+            nn.Sigmoid()
+        )
 
     def forward(self, input):
 

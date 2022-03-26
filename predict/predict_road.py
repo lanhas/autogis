@@ -66,9 +66,9 @@ def main():
         if not crop_val:
             batch_img_array = torch.Tensor(np.transpose(batch_img_array,
                                               axes=(0, 3, 1, 2)) / 255.0).to(device)
-            output_logist = model(batch_img_array).max(1)[1]
+            outputs = model(batch_img_array).squeeze(dim=1)
 
-            outputs_maps = output_logist.cpu().numpy()
+            outputs_maps = outputs.cpu().numpy()
 
         else:
             batch_predict_test_maps = np.zeros((len(batch_img_path_list), img_size[0], img_size[1]))
@@ -90,9 +90,8 @@ def main():
                     batch_patch_test_img = torch.Tensor(np.transpose(batch_patch_test_img,
                                                                         axes=(0, 3, 1, 2)) / 255.0).to(device)
 
-                    output_logist = model(batch_patch_test_img)
-                    output_logist = torch.sigmoid(output_logist)
-                    output_maps = np.squeeze(output_logist.data.cpu().numpy())
+                    outputs = model(batch_patch_test_img).squeeze(dim=1)
+                    output_maps = outputs.data.cpu().numpy()
                     outputs_maps_crops = output_maps[:, miro_margin:miro_margin + crop_size,
                                                             miro_margin:miro_margin + crop_size]
 
