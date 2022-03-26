@@ -37,7 +37,7 @@ def main():
     ckpt_path = None            # path to latest checkpoint (default: none)
     enable_vis = True
     hard_mining = True
-    model_name = "dense-unet"   # choose model for training (default: unet_small)
+    model_name = "dense_unet"   # choose model for training (default: unet_small)
 
     # train
     # lr_policy = 'cyclic_lr'
@@ -186,7 +186,7 @@ def make_train_step(img_data, model, optimizer, criterion, meters):
     optimizer.zero_grad()
     outputs = model(images)
 
-    outputs = torch.sigmoid(outputs)
+    outputs = torch.sigmoid(outputs).squeeze(dim=1)
     loss = criterion(outputs, labels)
 
     # backward
@@ -272,7 +272,7 @@ def validate(valid_loader, model, criterion, logger, epoch_num):
         # forward
         outputs = model(images)
 
-        outputs = torch.sigmoid(outputs)
+        outputs = torch.sigmoid(outputs).squeeze(dim=1)
         loss = criterion(outputs, labels)
         valid_acc.update(metrics.dice_coeff(outputs, labels), outputs.size(0))
         valid_loss.update(loss.item(), outputs.size(0))
