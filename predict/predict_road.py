@@ -14,8 +14,8 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    thres = 0.5
     batch_size = 1
-    crop_val = True
     crop_size = 500
     patch_size = 512
     img_size = (2448, 2448)
@@ -63,50 +63,55 @@ def main():
         batch_img_list = [np.array(Image.open(path)) for path in batch_img_path_list]
         batch_img_array = np.array(batch_img_list)
 
-        if not crop_val:
-            batch_img_array = torch.Tensor(np.transpose(batch_img_array,
-                                              axes=(0, 3, 1, 2)) / 255.0).to(device)
-            outputs = model(batch_img_array).squeeze(dim=1)
+        batch_predict_test_maps = np.zeros((len(batch_img_path_list), img_size[0], img_size[1]))
+        predict_test_mask = np.zeros(img_size)
 
-            outputs_maps = outputs.cpu().numpy()
+        test_img_miro_array = np.pad(batch_img_array, pad_width=[(0, 0),
+                                        (miro_margin, miro_margin),
+                                        (miro_margin, miro_margin),
+                                        (0, 0)], mode='reflect')
 
-        else:
-            batch_predict_test_maps = np.zeros((len(batch_img_path_list), img_size[0], img_size[1]))
-            test_img_miro_array = np.pad(batch_img_array, pad_width=[(0, 0),
-                                            (miro_margin, miro_margin),
-                                            (miro_margin, miro_margin),
-                                            (0, 0)], mode='reflect')
+        for i, start_row in enumerate(stride_idx_height):
+            for j, start_col in enumerate(stride_idx_width):
 
-            for i, start_row in enumerate(stride_idx_height):
-                for j, start_col in enumerate(stride_idx_width):
-                    if start_row + crop_size > img_size[0]:
-                        start_row = img_size[0] - crop_size
-                    if start_col + crop_size > img_size[1]:
-                        start_col = img_size[1] - crop_size
+                batch_temp_test_maps = np.zeros((len(batch_img_path_list), img_size[0], img_size[1]))
+                temp_test_mask = np.zeros(img_size)
 
-                    batch_patch_test_img = test_img_miro_array[:, start_row:start_row + patch_size,
-                                                                     start_col:start_col + patch_size, :]
+                if start_row + crop_size > img_size[0]:
+                    start_row = img_size[0] - crop_size
+                if start_col + crop_size > img_size[1]:
+                    start_col = img_size[1] - crop_size
 
-                    batch_patch_test_img = torch.Tensor(np.transpose(batch_patch_test_img,
-                                                                        axes=(0, 3, 1, 2)) / 255.0).to(device)
+                batch_patch_test_img = test_img_miro_array[:, start_row:start_row + patch_size,
+                                                                 start_col:start_col + patch_size, :]
 
-                    outputs = model(batch_patch_test_img).squeeze(dim=1)
-                    output_maps = outputs.data.cpu().numpy()
-                    outputs_maps_crops = output_maps[:, miro_margin:miro_margin + crop_size,
-                                                            miro_margin:miro_margin + crop_size]
+                batch_patch_test_img = torch.Tensor(np.transpose(batch_patch_test_img,
+                                                                    axes=(0, 3, 1, 2)) / 255.0).to(device)
 
-                    batch_predict_test_maps[:, start_row:start_row + crop_size,
-                                            start_col:start_col + crop_size] = outputs_maps_crops
-            outputs_maps = batch_predict_test_maps
+                output_maps = model(batch_patch_test_img)
+                output_maps = np.squeeze(output_maps.data.cpu().numpy(), dim=1)
+
+                outputs_maps_crops = output_maps[:, miro_margin:miro_margin + crop_size,
+                                                 miro_margin:miro_margin + crop_size]
+
+                batch_temp_test_maps[:, start_row:start_row + crop_size,
+                                     start_col:start_col + crop_size] = outputs_maps_crops
+                temp_test_mask[start_row:start_row+crop_size, start_col:start_col+crop_size] = np.ones((crop_size, crop_size))
+
+                batch_predict_test_maps = batch_predict_test_maps + batch_temp_test_maps
+                predict_test_mask = predict_test_mask + temp_test_mask
+
+        predict_test_mask = np.expand_dims(predict_test_mask, axis=0)
+
+        batch_predict_test_maps = batch_predict_test_maps / predict_test_mask
 
         for img_idx, img_path in enumerate(batch_img_path_list):
             save_path = save_subdir / img_path.name
-            outputs_maps = outputs_maps[img_idx, :].astype('uint8')
-            outputs_maps[outputs_maps > 0] = 255
-            Image.fromarray(outputs_maps).save(save_path)
+            save_test_map = np.zeros(img_size)
+            save_test_map[batch_predict_test_maps[img_idx, :] >= thres] = 255
+            Image.fromarray(save_test_map).save(save_path)
             print('saved predicted image {}'.format(img_path.name))
 
 
 if __name__ == "__main__":
     main()
-
