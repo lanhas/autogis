@@ -21,7 +21,6 @@ def main():
     img_size = (2448, 2448)
 
     # setup model
-    # setup model
     model_map = {
         'unet': network.unet,
         'unet_small': network.unet_small,
