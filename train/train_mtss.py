@@ -42,7 +42,7 @@ def get_dataset(data_root, crop_size=512):
 
 def main():
     # 超参数设置
-    start_epoch = 0
+    start_epoch = 1
     epochs = 75
     ckpt_path = Path('')
     enable_vis = True
@@ -210,7 +210,7 @@ def train(train_loader, model, model_name, optimizer, lr_scheduler, criterion, m
         # if cyclic_lr
         lr_scheduler.step()
         if idx and idx % log_iter == 0:
-            step = (epoch_num * (logger['print_freq']+resigual)) + (idx / log_iter)
+            step = ((epoch_num-1) * (logger['print_freq']+resigual)) + (idx / log_iter)
             score = train_metrics.get_results()
             # log accurate and loss
             info = {
@@ -285,22 +285,18 @@ def validate(valid_loader, model, model_name, criterion, meters, logger, epoch_n
 
         # visdom logging
 
-        if idx and idx % log_iter == 0:
-            step = (epoch_num * (logger['print_freq']+residual)) + (idx / log_iter)
-            score = meters.get_results()
-            # log accuracy and loss
-            info = {
-                'Valid Loss': score["Loss"],
-                'Valid Overall Acc': score["Overall Acc"],
-                'Valid Class IoU': score["Class IoU"],
-                'Valid Mean IoU': score['Mean IoU']
-            }
-
-            for tag, value in info.items():
-                logger['vis'].vis_scalar(tag, step, value)
-
-    # summary
     score = meters.get_results()
+    # log accuracy and loss
+    info = {
+        'Valid Loss': score["Loss"],
+        'Valid Overall Acc': score["Overall Acc"],
+        'Valid Class IoU': score["Class IoU"],
+        'Valid Mean IoU': score['Mean IoU']
+    }
+
+    for tag, value in info.items():
+        logger['vis'].vis_scalar(tag, epoch_num, value)
+
     # logging
     print('Valid Loss: {:.4f} Overall Acc: {:.4f} Mean IoU: {:.4f} '.format(
         score["Loss"], score["Overall Acc"], score['Mean IoU']))
