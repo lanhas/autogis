@@ -78,7 +78,7 @@ def main():
                                             (0, 0)], mode='reflect')
 
             for i, start_row in enumerate(stride_idx_height):
-                for j, start_col in enumerate(stride_idx_height):
+                for j, start_col in enumerate(stride_idx_width):
                     if start_row + crop_size > img_size[0]:
                         start_row = img_size[0] - crop_size
                     if start_col + crop_size > img_size[1]:

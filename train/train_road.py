@@ -32,17 +32,16 @@ def get_dataset(data_root, crop_size=256):
 
 def main():
     # 超参数设置
-    start_epoch = 0
+    start_epoch = 1
     epochs = 75                 # number of total epochs to run (default: 75)
     ckpt_path = None            # path to latest checkpoint (default: none)
     enable_vis = True
-    hard_mining = True
     model_name = "dense_unet"   # choose model for training (default: unet_small)
 
     # train
     # lr_policy = 'cyclic_lr'
     lr_policy = 'step_lr'
-    lr = 5e-4                   # initial learning rate (default: 1e-3)
+    lr = 1e-4                   # initial learning rate (default: 1e-3)
     max_lr = 2e-3
     weight_decay = 1e-4         # weight decay of SGD optimizer,
     bce_loss_weight = 1.0       # weight of Dice or Jaccard term of the joint loss (default: 1.0)
@@ -276,19 +275,15 @@ def validate(valid_loader, model, criterion, logger, epoch_num):
         valid_loss.update(loss.item(), outputs.size(0))
         valid_iou.update(metrics.jaccard_index(outputs, labels), outputs.size(0))
 
-        # visdom logging
-        if idx and idx % log_iter == 0:
-            step = (epoch_num*(logger['print_freq']+residual))+(idx/log_iter)
+    # log accuracy and loss
+    info = {
+        'loss': valid_loss.avg,
+        'accuracy': valid_acc.avg,
+        'IoU': valid_iou.avg
+    }
 
-            # log accuracy and loss
-            info = {
-                'loss': valid_loss.avg,
-                'accuracy': valid_acc.avg,
-                'IoU': valid_iou.avg
-            }
-
-            for tag, value in info.items():
-                logger['vis'].vis_scalar(tag, step, value)
+    for tag, value in info.items():
+        logger['vis'].vis_scalar(tag, epoch_num, value)
 
     # logging
     print('Validation Loss: {:.4f} Acc: {:.4f} IoU: {:.4f}'.format(
