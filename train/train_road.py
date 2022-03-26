@@ -142,7 +142,7 @@ def main():
         best_iou = max(valid_score['valid_IoU'], best_iou)
 
         sv_name = "{}-loss_{:.4f}-Acc_{:.4f}-IoU_{:.4f}-Epoch_{}".format(
-            model_name, valid_score['valid_loss'], valid_score['valid_loss'], valid_score['valid_IoU'], epoch)
+            model_name, valid_score['valid_loss'], valid_score['valid_acc'], valid_score['valid_IoU'], epoch)
         if is_best_iou:
             # print('saving loss best model')
             save_checkpoint({
@@ -232,7 +232,7 @@ def train(train_loader, model, optimizer, lr_scheduler, criterion, logger, hard_
                 cached_loss = 0
 
         if idx % log_iter == 0:
-            step = (epoch_num*(logger['print_freq'] + resigual))+idx
+            step = (epoch_num*(logger['print_freq'] + resigual)) + (idx / log_iter)
 
             # log accurate and loss
             info = {
