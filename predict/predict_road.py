@@ -1,45 +1,37 @@
-import os
-import utils
 import torch
 import network
-import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
 from PIL import Image
 from pathlib import Path
-from datasets.road import RoadSegm
-from torchvision import transforms as T
 
 
 def main():
+    model_name = 'unet_small'
+    ckpt = Path(r'checkpoints/mtss/best-mtss_resnet50-loss_0.2928-Acc_0.9008-IoU_0.7003-Epoch_42.pth')
+    data_path = Path(r'F:\Dataset\tradition_villages_old\Segmentation\JPEGImages')
+    save_dir = Path(r'F:\Dataset\results\tradition_villages_old')
 
-    model_name = 'unet_small'   # choose model for training
-    ckpt = Path('')
-    data = Path('')             # path to the test dataset
-    save_dir = Path('')         # path to the predicted results (default: ./test_predict)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    batch_size = 1
+    crop_val = True
+    crop_size = 500
+    patch_size = 512
+    img_size = (2448, 2448)
 
-    batch_size = 10             # batch size for prediction process (default: 10)
-    crop_size = 80              # cropped size from the patch of prediction (default: 80)
-    patch_size = 112            # patch size for image cropped from orig image (default: 112)')
-
-
-    # Setup model
+    # setup model
+    # setup model
     model_map = {
-        'mtss_resnet50': network.mtss_resnet50,
-        'mtss_resnet101': network.mtss_resnet101,
-        'mtss_mobilenet': network.mtss_mobilenet,
-        'deeplabv3plus_resnet50': network.deeplabv3plus_resnet50,
-        'deeplabv3plus_resnet101': network.deeplabv3plus_resnet101,
-        'deeplabv3plus_mobilenet': network.deeplabv3plus_mobilenet
+        'unet': network.unet,
+        'unet_small': network.unet_small
     }
+    model = model_map[model_name]().to(device)
 
-    model = model_map[model_name]
     if ckpt.is_file():
         print("=> loading checkpoint '{}".format(ckpt))
         checkpoint = torch.load(ckpt)
-        model.load_state_dict
+        model.load_state_dict(checkpoint["state_dict"], False)
     else:
         print("=> no checkpoint found at '{}'".format(ckpt))
 
@@ -49,37 +41,71 @@ def main():
         save_subdir.mkdir()
 
     model.eval()
-    if data.is_dir():
-        fileNames_predict = list(filter(lambda x: x.endswith('.jpg'), data.iterdir()))
-    elif data.is_file():
-        fileNames_predict = [data]
+    if data_path.is_dir():
+        file_names_img = list(filter(lambda x: x.suffix == '.jpg', data_path.iterdir()))
+    elif data_path.is_file():
+        file_names_img = [data_path]
     else:
-        print("data path error! please check!")
+        raise ValueError('data path error! please check!')
 
-    # stride = int(crop_size / 2)
-    # stride_idx = list(range(0, 1024, stride))
+    batch_num = len(file_names_img) // batch_size + 1
 
-    # miro_margin = int((patch_size-crop_size)/2)
-    batch_num = len(fileNames_predict) // batch_size + 1
+    # crop_val
+    stride = crop_size * 1
+    stride_idx_width = list(range(0, img_size[1], stride))
+    stride_idx_height = list(range(0, img_size[0], stride))
+    miro_margin = int((patch_size - crop_size) / 2)
 
     for batch_idx in tqdm(range(0, batch_num)):
-        batch_img_path_list = fileNames_predict[batch_idx*batch_size:(batch_idx+1)*batch_size]
-        # batch_img_name_list = [path.name for path in batch_img_path_list]
+        batch_img_path_list = file_names_img[batch_idx * batch_size:(batch_idx + 1) * batch_size]
 
         batch_img_list = [np.array(Image.open(path)) for path in batch_img_path_list]
         batch_img_array = np.array(batch_img_list)
 
-        # for i, strt_row in enumerate(stride_idx):
-        #     for j, start_col in enumerate(stride_idx):
-        batch_imgs = torch.Tensor(np.transpose(batch_img_array, axes=(0, 3, 1, 2)) / 255.0).to(device)
-        output_logist = model(batch_imgs)
-        output_maps = np.squeeze(output_logist.item())
+        if not crop_val:
+            batch_img_array = torch.Tensor(np.transpose(batch_img_array,
+                                              axes=(0, 3, 1, 2)) / 255.0).to(device)
+            output_logist = model(batch_img_array).max(1)[1]
+
+            outputs_maps = output_logist.cpu().numpy()
+
+        else:
+            batch_predict_test_maps = np.zeros((len(batch_img_path_list), img_size[0], img_size[1]))
+            test_img_miro_array = np.pad(batch_img_array, pad_width=[(0, 0),
+                                            (miro_margin, miro_margin),
+                                            (miro_margin, miro_margin),
+                                            (0, 0)], mode='reflect')
+
+            for i, start_row in enumerate(stride_idx_height):
+                for j, start_col in enumerate(stride_idx_height):
+                    if start_row + crop_size > img_size[0]:
+                        start_row = img_size[0] - crop_size
+                    if start_col + crop_size > img_size[1]:
+                        start_col = img_size[1] - crop_size
+
+                    batch_patch_test_img = test_img_miro_array[:, start_row:start_row + patch_size,
+                                                                     start_col:start_col + patch_size, :]
+
+                    batch_patch_test_img = torch.Tensor(np.transpose(batch_patch_test_img,
+                                                                        axes=(0, 3, 1, 2)) / 255.0).to(device)
+
+                    output_logist = model(batch_patch_test_img).max(1)[1]
+                    outputs_maps_patch = output_logist.cpu().numpy()
+                    outputs_maps_crops = outputs_maps_patch[:, miro_margin:miro_margin + crop_size,
+                                                            miro_margin:miro_margin + crop_size]
+
+                    batch_predict_test_maps[:, start_row:start_row + crop_size,
+                                            start_col:start_col + crop_size] = outputs_maps_crops
+            outputs_maps = batch_predict_test_maps
 
         for img_idx, img_path in enumerate(batch_img_path_list):
             save_path = save_subdir / img_path.name
-            Image.fromarray(output_maps[img_idx, :]).save(save_path)
+            outputs_maps = outputs_maps[img_idx, :].astype('uint8')
+            outputs_maps[outputs_maps > 0] = 255
+            Image.fromarray(outputs_maps).save(save_path)
             print('saved predicted image {}'.format(img_path.name))
 
 
 if __name__ == "__main__":
     main()
+

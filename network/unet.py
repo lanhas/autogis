@@ -11,7 +11,6 @@ class encoding_block(nn.Module):
         super().__init__()
 
         if batch_norm:
-
             # reflection padding for same size output as input (reflection padding has shown better results than zero padding)
             layers = [nn.ReflectionPad2d(padding=(kernel_size -1)//2),
                       nn.Conv2d(in_size, out_size, kernel_size=kernel_size, padding=padding, stride=stride, dilation=dilation),

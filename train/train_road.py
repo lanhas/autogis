@@ -2,9 +2,9 @@ import os
 import torch
 import numpy as np
 import torch.nn as nn
+import network
 from copy import deepcopy
 from utils import metrics
-from network.unet import UNet, UNetSmall
 from torch.utils import data
 from datasets.road import RoadSegm
 from utils import ext_transforms as et
@@ -69,8 +69,8 @@ def main():
 
     # setup model
     model_map = {
-        'unet': UNet,
-        'unet_small': UNetSmall
+        'unet': network.unet,
+        'unet_small': network.unet_small
     }
     model = model_map[model_name]().to(device)
 
@@ -79,7 +79,7 @@ def main():
 
     # setup optimizer
     optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=lr,)
+    # optimizer = torch.optim.Adam(params=model.parameters(), lr=lr)
 
     # decay LR
     if lr_policy == 'cyclic_lr':

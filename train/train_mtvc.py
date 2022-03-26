@@ -18,13 +18,13 @@ def get_dataset(data_root, arch_type='siamese', crop_size=512, cropval=512):
         # T.RandomScale((0.5, 2.0)),
         T.RandomRotation(180),
         T.ToTensor(),
-        T.Normalize((0.485), (0.229)),
+        T.Normalize(0.485, 0.229),
     ])
 
     val_transform = T.Compose([
         T.Resize(size=cropval),
         T.ToTensor(),
-        T.Normalize((0.485), (0.229)),
+        T.Normalize(0.485, 0.229),
     ])
     # siamese网络数据集
     if arch_type == 'classificationNet' or arch_type == 'onlinePairSelection' or arch_type == 'onlineTripletSelection':

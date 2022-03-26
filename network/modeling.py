@@ -5,6 +5,7 @@ from .mtss import Mtss, MtssHead, ElevationProcess
 from .mtvc import EmbeddingResNet, EmbeddingNet, SiameseNet, TripletNet, ClassificationNet
 from .backbone import mobilenetv2
 from .backbone import resnet
+from .unet import UNet, UNetSmall
 
 
 def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_backbone):
@@ -263,3 +264,13 @@ def onlineTripletSelection(embedding_name, num_classes=6):
     """Constructs a Mtvc model with embedding Network"""
     return _load_ClasModel('onlineTripletSelection', embedding_name, num_classes=num_classes)
 
+
+# road extract
+def unet():
+    """Constructs an unt model with embedding Network"""
+    return UNet()
+
+
+def unet_small():
+    """Constructs an unt model with embedding Network"""
+    return UNetSmall()
