@@ -6,6 +6,7 @@ from .mtvc import EmbeddingResNet, EmbeddingNet, SiameseNet, TripletNet, Classif
 from .backbone import mobilenetv2
 from .backbone import resnet
 from .unet import UNet, UNetSmall
+from .dunet import Dunet
 
 
 def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_backbone):
@@ -274,3 +275,8 @@ def unet():
 def unet_small():
     """Constructs an unt model with embedding Network"""
     return UNetSmall()
+
+
+def dense_unet():
+    """Constructs an dense_unt model with embedding Network"""
+    return Dunet()

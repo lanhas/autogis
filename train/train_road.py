@@ -14,15 +14,15 @@ from tqdm import tqdm
 
 
 # 数据加载
-def get_dataset(data_root, crop_size=512):
+def get_dataset(data_root, crop_size=256):
     train_transform = et.ExtCompose([
-            et.ExtRandomScale((0.5, 2.0)),
+            # et.ExtRandomScale((0.5, 2.0)),
             et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             et.ExtRandomHorizontalFlip(),
             et.ExtToTensor(),
         ])
     val_transform = et.ExtCompose([
-            et.ExtRandomCrop(size=(512, 512), pad_if_needed=True),
+            et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             et.ExtToTensor(),
         ])
     train_dst = RoadSegm(root_dir=data_root, status='train', transform=train_transform)
@@ -37,7 +37,7 @@ def main():
     ckpt_path = None            # path to latest checkpoint (default: none)
     enable_vis = True
     hard_mining = True
-    model_name = "unet_small"   # choose model for training (default: unet_small)
+    model_name = "dense-unet"   # choose model for training (default: unet_small)
 
     # train
     # lr_policy = 'cyclic_lr'
@@ -70,7 +70,8 @@ def main():
     # setup model
     model_map = {
         'unet': network.unet,
-        'unet_small': network.unet_small
+        'unet_small': network.unet_small,
+        'dense_unet': network.dense_unet,
     }
     model = model_map[model_name]().to(device)
 
@@ -185,7 +186,7 @@ def make_train_step(img_data, model, optimizer, criterion, meters):
     optimizer.zero_grad()
     outputs = model(images)
 
-    outputs = torch.sigmoid(outputs).squeeze(dim=1)
+    outputs = torch.sigmoid(outputs)
     loss = criterion(outputs, labels)
 
     # backward
@@ -271,7 +272,7 @@ def validate(valid_loader, model, criterion, logger, epoch_num):
         # forward
         outputs = model(images)
 
-        outputs = torch.sigmoid(outputs).squeeze(dim=1)
+        outputs = torch.sigmoid(outputs)
         loss = criterion(outputs, labels)
         valid_acc.update(metrics.dice_coeff(outputs, labels), outputs.size(0))
         valid_loss.update(loss.item(), outputs.size(0))

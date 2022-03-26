@@ -24,7 +24,8 @@ def main():
     # setup model
     model_map = {
         'unet': network.unet,
-        'unet_small': network.unet_small
+        'unet_small': network.unet_small,
+        'dense_unet': network.dense_unet,
     }
     model = model_map[model_name]().to(device)
 
@@ -89,9 +90,10 @@ def main():
                     batch_patch_test_img = torch.Tensor(np.transpose(batch_patch_test_img,
                                                                         axes=(0, 3, 1, 2)) / 255.0).to(device)
 
-                    output_logist = model(batch_patch_test_img).max(1)[1]
-                    outputs_maps_patch = output_logist.cpu().numpy()
-                    outputs_maps_crops = outputs_maps_patch[:, miro_margin:miro_margin + crop_size,
+                    output_logist = model(batch_patch_test_img)
+                    output_logist = torch.sigmoid(output_logist)
+                    output_maps = np.squeeze(output_logist.data.cpu().numpy())
+                    outputs_maps_crops = output_maps[:, miro_margin:miro_margin + crop_size,
                                                             miro_margin:miro_margin + crop_size]
 
                     batch_predict_test_maps[:, start_row:start_row + crop_size,
