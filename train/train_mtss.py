@@ -102,7 +102,7 @@ def main():
     # decay LR
     if lr_policy == 'poly':
         lr_scheduler = utils.PolyLR(optimizer, epochs, power=0.9)
-    elif lr_policy == 'step':
+    elif lr_policy == 'step_lr':
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)
     elif lr_policy == 'cyclic_lr':
         lr_scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=lr,
