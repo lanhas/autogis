@@ -19,19 +19,10 @@ def get_dataset(data_root, crop_size=512):
             et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             et.ExtRandomHorizontalFlip(),
             et.ExtToTensor(),
-            et.ExtNormalize(mean_image=[0.2737, 0.3910, 0.3276],
-                            std_image=[0.1801, 0.1560, 0.1301],
-                            mean_dem=[0.4153],
-                            std_dem=[0.2405]
-                            ),
         ])
     val_transform = et.ExtCompose([
             et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             et.ExtToTensor(),
-            et.ExtNormalize(mean_image=[0.2737, 0.3910, 0.3276],
-                            std_image=[0.1801, 0.1560, 0.1301],
-                            mean_dem=[0.4153],
-                            std_dem=[0.2405]),
         ])
     train_dst = villageFactorsSegm(root_mtsd=data_root,
                                    image_set='train', transform=train_transform)
@@ -55,15 +46,15 @@ def main():
     output_stride = 16  # choices=[8, 16]
 
     # train
-    lr = 1e-4
-    lr_policy = 'cyclic_lr'
+    lr = 5e-4
+    lr_policy = 'step_lr'
     max_lr = 1e-3
     weight_decay = 1e-4
     step_size = 12
 
-    train_batch_size = 2
-    valid_batch_size = 2
-    crop_size = 256
+    train_batch_size = 8
+    valid_batch_size = 4
+    crop_size = 512
     loss_type = 'cross_entropy'  # choices=['cross_entropy', 'focal_loss']
     data_root = Path(r'F:\Dataset\tradition_villages1\Segmentation')
 
@@ -105,7 +96,8 @@ def main():
         raise ValueError("loss_type name error! Please check!")
 
     # set up optimizer
-    optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
+    # optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=lr)
 
     # decay LR
     if lr_policy == 'poly':
@@ -208,7 +200,7 @@ def train(train_loader, model, model_name, optimizer, lr_scheduler, criterion, m
     for idx, img_data in enumerate(tqdm(train_loader)):
         train_metrics = make_train_step(img_data, model, model_name, optimizer, criterion, metrics)
         # if cyclic_lr
-        lr_scheduler.step()
+        # lr_scheduler.step()
         if idx and idx % log_iter == 0:
             step = ((epoch_num-1) * (logger['print_freq']+resigual)) + (idx / log_iter)
             score = train_metrics.get_results()
@@ -224,7 +216,7 @@ def train(train_loader, model, model_name, optimizer, lr_scheduler, criterion, m
     # summary
     score = metrics.get_results()
     # if step_lr
-    # lr_scheduler.step()
+    lr_scheduler.step()
     print('Training Loss: {:.4f} Overall Acc: {:.4f} Mean IoU: {:.4f} '.format(
         score["Loss"], score["Overall Acc"], score['Mean IoU']))
     print()

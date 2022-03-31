@@ -61,7 +61,7 @@ cfgs = {
 
 
 def VGG16(pretrained, in_channels, **kwargs):
-    model = VGG(make_layers(cfgs["D"], batch_norm = False, in_channels = in_channels), **kwargs)
+    model = VGG(make_layers(cfgs["D"], batch_norm=False, in_channels=in_channels), **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url("https://download.pytorch.org/models/vgg16-397923af.pth", model_dir="./models/pretrained")
         model.load_state_dict(state_dict)
@@ -69,3 +69,4 @@ def VGG16(pretrained, in_channels, **kwargs):
     del model.avgpool
     del model.classifier
     return model
+

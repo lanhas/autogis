@@ -24,8 +24,10 @@ class villageFactorsSegm(data.Dataset):
         self.root_mtsd = Path(root_mtsd)
         self.transform = transform
         self.image_set = image_set
-        image_dir = self.root_mtsd / 'JPEGImages'
-        dem_dir = self.root_mtsd / 'DEMImages'
+        # image_dir = self.root_mtsd / 'JPEGImages'
+        # dem_dir = self.root_mtsd / 'DEMImages'
+        image_dir = self.root_mtsd / 'RemoteData'
+        dem_dir = self.root_mtsd / 'ElevationData'
         mask_dir = self.root_mtsd / 'SegmentationClass'
         split_f = self.root_mtsd / 'ImageSets/Segmentation' / (image_set + '.txt')
         if not split_f.exists():
@@ -36,8 +38,10 @@ class villageFactorsSegm(data.Dataset):
         with open(split_f, "r") as f:
             file_names = [x.strip() for x in f.readlines()]
 
-        self.images = [image_dir / (x + '.jpg') for x in file_names]
-        self.dems = [dem_dir / (x + '.jpg') for x in file_names]
+        # self.images = [image_dir / (x + '.jpg') for x in file_names]
+        # self.dems = [dem_dir / (x + '.jpg') for x in file_names]
+        self.images = [image_dir / (x + '.tif') for x in file_names]
+        self.dems = [dem_dir / (x + '.tif') for x in file_names]
         self.masks = [mask_dir / (x + ".png") for x in file_names]
         assert (len(self.images) == len(self.masks) and len(self.dems) == len(self.masks))
 
@@ -48,8 +52,8 @@ class villageFactorsSegm(data.Dataset):
         Returns:
             tuple: (image, target) where target is the image segmentation.
         """
-        img = Image.open(self.images[index]).convert('RGB')
-        dem = Image.open(self.dems[index]).convert('L')
+        img = Image.open(self.images[index])
+        dem = Image.open(self.dems[index])
         target = Image.open(self.masks[index])
         if self.transform is not None:
             img, dem, target = self.transform(img, dem, target)

@@ -40,6 +40,7 @@ class ConvBNReLU(nn.Sequential):
             nn.ReLU6(inplace=True)
         )
 
+
 def fixed_padding(kernel_size, dilation):
     """
     对使用空洞卷积后的padding进行修正
@@ -60,6 +61,7 @@ def fixed_padding(kernel_size, dilation):
     pad_beg = pad_total // 2
     pad_end = pad_total - pad_beg
     return (pad_beg, pad_end, pad_beg, pad_end) 
+
 
 # ③
 class InvertedResidual(nn.Module):
@@ -96,6 +98,7 @@ class InvertedResidual(nn.Module):
             return x + self.conv(x_pad)
         else:
             return self.conv(x_pad)
+
 
 class MobileNetV2(nn.Module):
     def __init__(self, num_classes=1000, output_stride=8, width_mult=1.0, inverted_residual_setting=None, round_nearest=8):
@@ -212,23 +215,3 @@ def mobilenet_v2(pretrained=False, progress=True, **kwargs):
                                               progress=progress)
         model.load_state_dict(state_dict)
     return model
-
-if __name__ == "__main__":
-    import numpy as np
-    import torch 
-    backbone1 = mobilenet_v2()
-    print(backbone1)
-    # net = backbone1.features
-
-    # data = torch.rand(1,3,224,224)
-    # backbone1.low_level_features = backbone1.features[0:4]
-    # backbone1.high_level_features = backbone1.features[4:-1]
-    # backbone1.features = None
-    # backbone1.classifier = None
-
-    # for name, module in backbone1.named_children():
-    #     print(name)
-    #     print(module)
-    #     print('===============================================')
-    # print(net)
-    # print(net(data).shape)
