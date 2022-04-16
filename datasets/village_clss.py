@@ -6,7 +6,7 @@ from torch.utils.data.dataset import Dataset
 from torch.utils.data.sampler import BatchSampler
 
 
-class Mtvcd(Dataset):
+class VillageClss(Dataset):
     """
     Train: 
     test:
@@ -59,8 +59,12 @@ class SiameseMtvcd(Dataset):
         data = np.loadtxt(split_f, dtype=str, delimiter=',')
         file_names = list(data[:, 0])
 
-        self.labels = np.array(data[:, 1])
+        label = np.array(data[:, 1])
+        min_label = min(label)
+        label = [x - min_label for x in label]
+
         self.data = [os.path.join(image_dir, x + ".png") for x in file_names]
+        self.label = label
         self.labels_set = set(np.array(data[:, 1]))
         self.label_to_indices = {
             label: np.where(self.labels == label)[0] 

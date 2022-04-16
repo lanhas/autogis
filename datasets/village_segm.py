@@ -1,5 +1,5 @@
 import numpy as np
-import torch.utils.data as data
+from torch.utils.data import Dataset
 from pathlib import Path
 from PIL import Image
 
@@ -18,7 +18,7 @@ def village_cmap(N=7, normalized=False):
     return cmap
 
 
-class villageFactorsSegm(data.Dataset):
+class VillageSegm(Dataset):
     cmap = village_cmap()
     def __init__(self, root_mtsd, image_set='train', transform=None) -> None:
         self.root_mtsd = Path(root_mtsd)

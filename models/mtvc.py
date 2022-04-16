@@ -82,11 +82,11 @@ class EmbeddingNet(nn.Module):
         # self.up = nn.Upsample((100,100))
         self.features = nn.Sequential(*features)
         self.fc1 = nn.Sequential(
-            nn.Linear(32 * 32 * 32, 256),
+            nn.Linear(32 * 16 * 16, 256),
             nn.ReLU(),
             nn.Linear(256, 256),
             nn.ReLU(),
-            nn.Linear(256, 2)
+            nn.Linear(256, 20)
         )
 
     def forward(self, x):

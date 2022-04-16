@@ -1,0 +1,28 @@
+train_dataset: mtvc-old
+train_dataset_args:
+    root_path: F:\Dataset\tradition_villages_old\Classification
+
+val_dataset: mtss-old
+    root_path: F:\Dataset\tradition_villages_old\Classification
+
+model_name: siameseNetwork
+model_args:
+    embedding_name: embeddingNet
+    classifier_args: {n_classes: 10}
+
+batch_size: 6
+n_samples: 2
+num_classes: 6
+optimizer: adam
+optimizer_args: {lr: 1e-3}
+
+start_epoch: 1
+epochs: 75
+enable_vis: True
+step_size: 12
+crop_size: 256
+margin: 1.
+log_interval: 50
+print_freq: 10
+vis_port: 12370
+vis_env: main
