@@ -1,5 +1,6 @@
 from torch import nn
 import torch
+from .models import register
 
 
 # encoding block
@@ -196,3 +197,16 @@ class UNetSmall(nn.Module):
         final = nn.functional.interpolate(self.final(decode1), input.size()[2:], mode='bilinear', align_corners=True)
 
         return final
+
+
+# road extract
+@register('unet')
+def unet():
+    """Constructs an unt model with embedding Network"""
+    return UNet()
+
+
+@register('unet-small')
+def unet_small():
+    """Constructs an unt model with embedding Network"""
+    return UNetSmall()

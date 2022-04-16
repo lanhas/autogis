@@ -3,21 +3,82 @@ import torchvision
 import torch.nn.functional as F
 
 
-class Mtvc():
+class Mtvc:
     """
-    Multimodal traditional village classification(Mtvc) is a network to classify traditional village
+    Multimodal traditional village classification(Mtvc) is a models to classify traditional village
     which has specific landscape relationship in China.It carries out classify by sending remote sensing
-    image and DEM data into a sementic segmentation network named Mtsn to get the feature of landscape
-    elements.Then, we classify the feature through the classification network to get the village type.
+    image and DEM data into a sementic segmentation models named Mtsn to get the feature of landscape
+    elements.Then, we classify the feature through the classification models to get the village type.
 
     多模态传统村落分类网络是一个根据中国传统村落特殊的山水关系对村落类型进行分类的网络，它通过将村落的遥感影像和
     DEM数据送入一个Mtts语义分割网络得到山水要素的特征图，随后将其送入分类网络得到村落类型
 
     Arguments:
-        embedding(nn.Module):the network used to extract the represtation from feature map
+        embedding(nn.Module):the models used to extract the represtation from feature map
         n_classed: the number of classes
     """
     pass
+
+
+def _load_ClasModel(arch_type, embedding_name, num_classes):
+    """
+    村落分类模型加载
+    """
+    # create embedding_net
+    if embedding_name == 'embeddingNet':
+        embedding_net = EmbeddingNet()
+    elif embedding_name == 'embeddingResNet':
+        embedding_net = EmbeddingResNet()
+    else:
+        raise ValueError("embedding_name error!Please check and try again!")
+    # create model
+    if arch_type == 'classificationNet':
+        model = ClassificationNet(embedding_net, num_classes)
+    elif arch_type == 'siameseNetwork':
+        model = SiameseNet(embedding_net)
+    elif arch_type == 'tripletNetwork':
+        model = TripletNet(embedding_net)
+    elif arch_type == 'onlinePairSelection':
+        model = embedding_net
+    elif arch_type == 'onlineTripletSelection':
+        model = embedding_net
+    else:
+        raise ValueError("arch_type error!Please check and try again!")
+    return model
+
+
+
+# Classification model
+# Mtvc Baseline: classification with softmax
+def classificationNet(embedding_name, num_classes=6):
+    """Constructs a Mtvc classification with softmax"""
+    return _load_ClasModel('classificationNet', embedding_name, num_classes=num_classes)
+
+
+# siamese
+def siameseNetwork(embedding_name, num_classes=6):
+    """Constructs a Mtvc model with embedding Network"""
+    return _load_ClasModel('siameseNetwork', embedding_name, num_classes=num_classes)
+
+
+# triplet
+def tripletNetwork(embedding_name, num_classes=6):
+    """Constructs a Mtvc model with embedding Network"""
+    return _load_ClasModel('tripletNetwork', embedding_name, num_classes=num_classes)
+
+
+# onlinePairSelection
+def onlinePairSelection(embedding_name, num_classes=6):
+    """Constructs a Mtvc model with embedding Network"""
+    return _load_ClasModel('onlinePairSelection', embedding_name, num_classes=num_classes)
+
+
+# onlineTripletSelection
+def onlineTripletSelection(embedding_name, num_classes=6):
+    """Constructs a Mtvc model with embedding Network"""
+    return _load_ClasModel('onlineTripletSelection', embedding_name, num_classes=num_classes)
+
+
 
 
 class EmbeddingResNet(nn.Module):

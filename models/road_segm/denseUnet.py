@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.utils.checkpoint as cp
-from collections import OrderedDict
+from .models import register
 
 
 def _bn_function_factory(norm, relu, conv):
@@ -76,3 +75,9 @@ class DenseUnet(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
         self.db1 = _DenseBlock(3, 64, )
+
+
+@register('dense-unet')
+def dense_unet():
+    """Constructs an dense_unt model with embedding Network"""
+    return DenseUnet()
