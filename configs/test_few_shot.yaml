@@ -1,0 +1,4 @@
+dataset: village-clss
+dataset_args: {split: test}
+
+load: ./save/classifier_village-clss_resnet12/epoch-last.pth
