@@ -11,6 +11,7 @@ from torchvision.transforms import InterpolationMode
 #  Extended Transforms for Semantic Segmentation
 #
 
+
 class ExtCompose(object):
     """Composes several transforms together.
     Args:
@@ -38,6 +39,7 @@ class ExtCompose(object):
         format_string += '\n)'
         return format_string
 
+
 class ExtRandomHorizontalFlip(object):
     """Horizontally flip the given PIL Image randomly with a given probability.
 
@@ -62,6 +64,7 @@ class ExtRandomHorizontalFlip(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
+
 
 class ExtCenterCrop(object):
     """Crops the given PIL Image at the center.
@@ -110,6 +113,7 @@ class ExtRandomScale(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(size={0})'.format(self.size)
+
 
 class ExtScale(object):
     """Resize the input PIL Image to the given scale.
@@ -204,6 +208,7 @@ class ExtRandomRotation(object):
         format_string += ')'
         return format_string
 
+
 class ExtRandomHorizontalFlip(object):
     """Horizontally flip the given PIL Image randomly with a given probability.
     Args:
@@ -253,6 +258,7 @@ class ExtRandomVerticalFlip(object):
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
+
 class ExtPad(object):
     def __init__(self, diviser=32):
         self.diviser = diviser
@@ -264,6 +270,7 @@ class ExtPad(object):
         im = F.pad(img, ( pw//2, pw-pw//2, ph//2, ph-ph//2) )
         lbl = F.pad(lbl, ( pw//2, pw-pw//2, ph//2, ph-ph//2))
         return im, lbl
+
 
 class ExtToTensor(object):
     """Convert a ``PIL Image`` or ``numpy.ndarray`` to tensor.
@@ -289,6 +296,7 @@ class ExtToTensor(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
+
 
 class ExtNormalize(object):
     """Normalize a tensor image with mean and standard deviation.
@@ -418,7 +426,8 @@ class ExtResize(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(size={0})'.format(self.size) 
-    
+
+
 class ExtColorJitter(object):
     """Randomly change the brightness, contrast and saturation of an image.
 
@@ -514,6 +523,7 @@ class ExtColorJitter(object):
         format_string += ', saturation={0}'.format(self.saturation)
         format_string += ', hue={0})'.format(self.hue)
         return format_string
+
 
 class Lambda(object):
     """Apply a user-defined lambda as a transform.
