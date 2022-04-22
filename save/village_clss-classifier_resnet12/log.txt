@@ -1,0 +1,4 @@
+train dataset: torch.Size([1, 256, 256]) (x181), 6
+val dataset: torch.Size([1, 256, 256]) (x47), 6
+fs dataset: torch.Size([1, 256, 256]) (x47), 6
+num params: 8.0M
