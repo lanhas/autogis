@@ -1,313 +1,203 @@
-import utils
-import numpy as np
-import network
+import argparse
+import yaml
+
 import torch
-import torch.nn as nn
+import numpy as np
+import torch.nn.functional as F
 from tqdm import tqdm
 from pathlib import Path
-from torch.utils import data
-from utils.metrics import MtssMetrics
-from datasets.mtsd import villageFactorsSegm
-from utils import mul_transforms as et
-from utils.visualizer import Visualizer
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+
+import datasets
+import utils
+import models.village_segm as models
+from utils import metrics
 
 
-# 数据加载
-def get_dataset(data_root, crop_size=512):
-    train_transform = et.ExtCompose([
-            et.ExtRandomScale((0.5, 2.0)),
-            et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
-            et.ExtRandomHorizontalFlip(),
-            et.ExtToTensor(),
-        ])
-    val_transform = et.ExtCompose([
-            et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
-            et.ExtToTensor(),
-        ])
-    train_dst = villageFactorsSegm(root_mtsd=data_root,
-                                   image_set='train', transform=train_transform)
-    val_dst = villageFactorsSegm(root_mtsd=data_root, 
-                                 image_set='val', transform=val_transform)
-    return train_dst, val_dst
+def main(config):
+    svname = args.name
+    if svname is None:
+        svname = 'village_segm-' + config['model'] + '_' + config['model_args']['encoder']
+    if args.tag is not None:
+        svname += '_' + args.tag
 
+    save_path = Path.cwd() / 'save' / svname
+    utils.ensure_path(save_path)
+    utils.set_log_path(save_path)
 
-def main():
-    # 超参数设置
-    start_epoch = 1
-    epochs = 75
-    ckpt_path = Path('')
-    enable_vis = True
-    model_name = 'mtss_resnet50'
+    # setup visualize
+    writer = SummaryWriter(str(save_path / 'tensorboard'))
+    yaml.dump(config, open(save_path / 'config.yaml', 'w'))
 
-    num_classes = 7
+    # setup datasets
+    train_dataset = datasets.make(config['train_dataset'],
+                                  **config['train_dataset_args'])
+    val_dataset = datasets.make(config['val_dataset'],
+                                **config['val_dataset_args'])
 
-    # deeplab options
-    separable_conv = False
-    output_stride = 16  # choices=[8, 16]
+    train_loader = DataLoader(train_dataset, config['batch_size'], shuffle=True, pin_memory=True, drop_last=True)
+    val_loader = DataLoader(val_dataset, config['batch_size'], pin_memory=True, drop_last=True)
 
-    # train
-    lr = 5e-4
-    lr_policy = 'step_lr'
-    max_lr = 1e-3
-    weight_decay = 1e-4
-    step_size = 12
+    utils.log('train dataset: {} (x{}), {}'.format(
+        train_dataset[0][0].shape, len(train_dataset),
+        train_dataset.n_classes))
+    utils.log('val dataset: {} (x{}), {}'.format(
+        val_dataset[0][0].shape, len(val_dataset),
+        val_dataset.n_classes))
 
-    train_batch_size = 8
-    valid_batch_size = 4
-    crop_size = 512
-    loss_type = 'cross_entropy'  # choices=['cross_entropy', 'focal_loss']
-    data_root = Path(r'F:\Dataset\tradition_villages1\Segmentation')
-
-    # visdom
-    print_freq = 10
-    vis_port = 12370
-    vis_env = 'main'
-
-    # other
-    vis_num_samples = 2
-
-    # setup visualization
-    vis = Visualizer(port=vis_port, env=vis_env) if enable_vis else None
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print("Device: %s" % device)
-
-    # setup model
-    model_map = {
-        'mtss_resnet50': network.mtss_resnet50,
-        'deeplabv3plus_resnet50': network.deeplabv3plus_resnet50,
-        'mtss_resnet101': network.mtss_resnet101,
-        'deeplabv3plus_resnet101': network.deeplabv3plus_resnet101,
-        'mtss_mobilenet': network.mtss_mobilenet,
-        'deeplabv3plus_mobilenet': network.deeplabv3plus_mobilenet
-    }
-    model = model_map[model_name](num_classes=num_classes, output_stride=output_stride,
-                                  pretrained_backbone=True).to(device)
-    if separable_conv:
-        network.convert_to_separable_conv(model.segmention)
-    utils.set_bn_momentum(model.backbone, momentum=0.01)
-
-    # setup criterion
-    if loss_type == 'focal_loss':
-        criterion = utils.FocalLoss(ignore_index=255, size_average=True)
-    elif loss_type == 'cross_entropy':
-        criterion = nn.CrossEntropyLoss(ignore_index=255, reduction='mean')
+    if config.get('load'):
+        model_sv = torch.load(config['load'])
+        model = models.load(model_sv)
     else:
-        raise ValueError("loss_type name error! Please check!")
+        model = models.make(config['model'], **config['model_args'])
 
-    # set up optimizer
-    # optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=lr)
+    utils.log('num params: {}'.format(utils.compute_n_params(model)))
 
-    # decay LR
-    if lr_policy == 'poly':
-        lr_scheduler = utils.PolyLR(optimizer, epochs, power=0.9)
-    elif lr_policy == 'step_lr':
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)
-    elif lr_policy == 'cyclic_lr':
-        lr_scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=lr,
-                                                         max_lr=max_lr, step_size_up=50, step_size_down=50)
-    else:
-        raise ValueError('lr name error!please check!')
+    optimizer, lr_scheduler = utils.make_optimizer(
+        model.parameters(),
+        config['optimizer'], **config['optimizer_args'])
 
-    # set up metrics
-    metrics = MtssMetrics(num_classes)
+    # setup others
+    max_epoch = config['max_epoch']
+    max_vi = 0.
 
-    # starting params
-    best_loss = 999
-    best_acc = 0
-    best_iou = 0
+    timer_used = utils.Timer()
+    timer_epoch = utils.Timer()
 
-    if ckpt_path:
-        if ckpt_path.is_file():
-            print("=> loading checkpoint '{}'".format(ckpt_path))
-            checkpoint = torch.load(ckpt_path)
-            if checkpoint['epoch'] > start_epoch:
-                start_epoch = checkpoint['epoch']
+    if config['separable_conv']:
+        models.convert_to_separable_conv(model.segmention)
+    utils.set_bn_momentum(model.encoder, momentum=0.01)
 
-            best_loss = checkpoint['best_loss']
-            best_acc = checkpoint['best_acc']
-            model.load_state_dict(checkpoint["state_dict"])
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            print("=> loaded checkpoint '{}' (epoch {})".format(ckpt_path, checkpoint['epoch']))
-        else:
-            print("=> no checkpoint found at '{}'".format(ckpt_path))
-
-    # set up dataloader
-    # load data
-    train_dst, val_dst = get_dataset(data_root, crop_size)
-    train_loader = data.DataLoader(
-        train_dst, batch_size=train_batch_size, shuffle=True, num_workers=2, drop_last=True)
-    val_loader = data.DataLoader(
-        val_dst, batch_size=valid_batch_size, shuffle=True, num_workers=2, drop_last=True)
-    print("Dataset: Train set: %d, Val set: %d" %
-          (len(train_dst), len(val_dst)))
-
-    logger = {'vis': vis, 'print_freq': print_freq}
-
-    # ----------------------------------------train Loop---------------------------------- #
-    vis_sample_id = np.random.randint(0, len(val_loader), vis_num_samples,
-                                      np.int32) if enable_vis else None
-
-    for epoch in range(start_epoch, epochs):
-        print('Epoch {}/{}'.format(epoch, epochs - 1))
+    for epoch in range(1, max_epoch + 1):
+        print('Epoch {}/{}'.format(epoch, max_epoch))
         print('-' * 10)
-
+        timer_epoch.s()
         # run training
-        train_score = train(train_loader, model, model_name, optimizer, lr_scheduler, criterion, metrics, logger, epoch)
-        val_score = validate(val_loader, model, model_name, criterion, metrics, logger, epoch)
+        writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
+        train_score = train(train_loader, model, config['model'], optimizer, train_dataset.n_classes)
+        val_score = validate(val_loader, model, config['model'], val_dataset.n_classes)
 
-        # is_best_loss = val_score['Loss'] < best_loss
-        # is_best_acc = val_score['Overall Acc'] > best_acc
-        is_best_iou = val_score['Mean IoU'] > best_iou
+        # post
+        if lr_scheduler is not None:
+            lr_scheduler.step()
 
-        best_loss = min(val_score['Loss'], best_loss)
-        best_acc = max(val_score['Overall Acc'], best_acc)
-        best_iou - max(val_score['Mean IoU'], best_iou)
-        sv_name = "{}-loss_{:.4f}-Acc_{:.4f}-IoU_{:.4f}-Epoch_{}".format(
-                    model_name, val_score['Loss'], val_score['Overall Acc'], val_score['Mean IoU'], epoch)
-        if is_best_iou:
-            # print('saving loss best model')
-            save_checkpoint({
-                'epoch': epoch,
-                'arch': model,
-                'state_dict': model.state_dict(),
-                'best_loss': best_loss,
-                'best_acc': best_acc,
-                'best_iou': best_iou,
-                'optimizer': optimizer.state_dict()
-            }, is_best_iou, sv_name)
+        t_epoch = utils.time_str(timer_epoch.t())
+        t_used = utils.time_str(timer_used.t())
+        t_estimate = utils.time_str(timer_used.t() / epoch * max_epoch)
+
+        log_str = 'train loss: {:.4f} | train acc: {:.4f} | train iou:{:.4f}\n'.format(
+            train_score['tl'].get_avg(), train_score['ta'].get_avg(), train_score['tim'].get_avg())
+        log_str += 'val loss: {:.4f} | val acc: {:.4f} | val iou:{:.4f}\n'.format(
+            val_score['vl'].get_avg(), val_score['va'].get_avg(), val_score['vim'].get_avg())
+
+        writer.add_scalars('loss', {'train': train_score['tl'].get_avg()}, epoch)
+        writer.add_scalars('loss', {'val': val_score['vl'].get_avg()}, epoch)
+
+        writer.add_scalars('acc', {'train': train_score['ta'].get_avg()}, epoch)
+        writer.add_scalars('acc', {'val': val_score['va'].get_avg()}, epoch)
+
+        writer.add_scalars('mean_IoU', {'train': train_score['tim'].get_avg()}, epoch)
+        writer.add_scalars('mean_IoU', {'val': val_score['vim'].get_avg()}, epoch)
+
+        classes = ['unknow', 'mountain', 'forest', 'farm', 'water', 'wasteland', 'village']
+        [writer.add_scalars(v_class, {'train': train_score['tic'].get_avg()[i]}, epoch) for i, v_class in enumerate(classes)]
+        [writer.add_scalars(v_class, {'val': val_score['vic'].get_avg()[i]}, epoch) for i, v_class in enumerate(classes)]
+
+        if epoch <= max_epoch:
+            log_str += 't_epoch:{} | t_used:{}/{}'.format(t_epoch, t_used, t_estimate)
         else:
-            # print('saving accuracy best model')
-            save_checkpoint({
-                'epoch': epoch,
-                'arch': model,
-                'state_dict': model.state_dict(),
-                'best_loss': best_loss,
-                'best_acc': best_acc,
-                'best_iou': best_iou,
-                'optimizer': optimizer.state_dict()
-            }, is_best_iou, sv_name)
+            log_str += ', {}'.format(t_epoch)
+        utils.log(log_str)
+
+        training = {
+            'epoch': epoch,
+            'optimizer': config['optimizer'],
+            'optimizer_args': config['optimizer_args'],
+            'optimizer_sd': optimizer.state_dict(),
+        }
+        save_obj = {
+            'file': __file__,
+            'config': config,
+
+            'model': config['model'],
+            'model_args': config['model_args'],
+            'model_sd': model.state_dict(),
+
+            'training': training,
+        }
+
+        torch.save(save_obj, save_path / 'epoch-last.pth')
+        if val_score['vim'].get_avg() > max_vi:
+            max_vi = val_score['vim'].get_avg()
+            torch.save(save_obj, save_path / 'max-vi.pth')
+        writer.flush()
 
 
-def train(train_loader, model, model_name, optimizer, lr_scheduler, criterion, metrics, logger, epoch_num):
-    # reset scheduler
-    metrics.reset()
-    log_iter = len(train_loader) // logger['print_freq']
-    resigual = len(train_loader) % logger['print_freq']
+def train(train_loader, model, model_name, optimizer, n_classes):
+    aves_keys = ['tl', 'ta', 'tim', 'tic']
+    aves = {k: utils.metrics.MetricTracker() for k in aves_keys}
+
     model.train()
     # iterate over data
     for idx, img_data in enumerate(tqdm(train_loader)):
-        train_metrics = make_train_step(img_data, model, model_name, optimizer, criterion, metrics)
-        # if cyclic_lr
-        # lr_scheduler.step()
-        if idx and idx % log_iter == 0:
-            step = ((epoch_num-1) * (logger['print_freq']+resigual)) + (idx / log_iter)
-            score = train_metrics.get_results()
-            # log accurate and loss
-            info = {
-                'Train Loss': score["Loss"],
-                'Train Overall Acc': score["Overall Acc"],
-                'Train Class IoU': score["Class IoU"],
-                'Train Mean IoU': score['Mean IoU']
-            }
-            for tag, value in info.items():
-                logger['vis'].vis_scalar(tag, step, value)
-    # summary
-    score = metrics.get_results()
-    # if step_lr
-    lr_scheduler.step()
-    print('Training Loss: {:.4f} Overall Acc: {:.4f} Mean IoU: {:.4f} '.format(
-        score["Loss"], score["Overall Acc"], score['Mean IoU']))
-    print()
-    return score
-
-
-def make_train_step(img_data, model, model_name, optimizer, criterion, metrics):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    images = img_data[0].to(device, dtype=torch.float32)
-    dems = img_data[1].to(device, dtype=torch.float32)
-    labels = img_data[2].to(device, dtype=torch.long)
-    # zero the parameter gradients
-    optimizer.zero_grad()
-    if model_name[:4] == 'mtss':
-        outputs = model(images, dems)
-    else:
-        images = torch.cat((images, dems), 1)
-        outputs = model(images)
-
-    loss = criterion(outputs, labels)
-
-    # backward
-    loss.backward()
-    optimizer.step()
-
-    preds = outputs.detach().max(dim=1)[1].cpu().numpy()
-    targets = labels.cpu().numpy()
-    metrics.update(targets, preds, loss)
-    return metrics
-
-
-def validate(valid_loader, model, model_name, criterion, meters, logger, epoch_num):
-    
-    log_iter = len(valid_loader) // logger['print_freq']
-    residual = (len(valid_loader) % logger['print_freq']) // log_iter
-    # reset metrics
-    meters.reset()
-    
-    model.eval()
-    # Iterate over Data
-    for idx, img_data in enumerate(tqdm(valid_loader)):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        images = img_data[0].to(device, dtype=torch.float32)
-        dems = img_data[1].to(device, dtype=torch.float32)
-        labels = img_data[2].to(device, dtype=torch.long)
-        # forward
+        image, dem, label = img_data[0].cuda(), img_data[1].cuda(), img_data[2].cuda().long()
         if model_name[:4] == 'mtss':
-            outputs = model(images, dems)
+            logits = model(image, dem)
         else:
-            images = torch.cat((images, dems), 1)
-            outputs = model(images)
-        # pay attention to the weighted loss should input logits not probs
-        loss = criterion(outputs, labels)
+            images = torch.cat((image, dem), 1)
+            logits = model(images)
 
-        preds = outputs.detach().max(dim=1)[1].cpu().numpy()
-        targets = labels.cpu().numpy()
-        meters.update(targets, preds, loss)
+        loss = F.cross_entropy(logits, label)
+        acc = utils.compute_dice_coeff(logits, label, n_classes)
+        iou_mean, iou_cls = utils.compute_jaccard_index(logits, label, n_classes)
 
-        # visdom logging
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
-    score = meters.get_results()
-    # log accuracy and loss
-    info = {
-        'Valid Loss': score["Loss"],
-        'Valid Overall Acc': score["Overall Acc"],
-        'Valid Class IoU': score["Class IoU"],
-        'Valid Mean IoU': score['Mean IoU']
-    }
+        aves['tl'].add(loss.item())
+        aves['ta'].add(acc)
+        aves['tim'].add(iou_mean)
+        aves['tic'].add([*(iou_cls.values())])
 
-    for tag, value in info.items():
-        logger['vis'].vis_scalar(tag, epoch_num, value)
-
-    # logging
-    print('Valid Loss: {:.4f} Overall Acc: {:.4f} Mean IoU: {:.4f} '.format(
-        score["Loss"], score["Overall Acc"], score['Mean IoU']))
-    print()
-    return score
+    return aves
 
 
-def save_checkpoint(state, is_best, name):
-    """ save current model
-    """
-    checkpoint_dir = Path('./checkpoints/mtss')
-    if not checkpoint_dir.is_dir():
-        checkpoint_dir.mkdir()
-    filename = checkpoint_dir / (name + '.pth')
-    torch.save(state, filename)
-    if is_best:
-        filename_best = checkpoint_dir / ('best-' + name + '.pth')
-        filename_best.write_bytes(filename.read_bytes())
+def validate(val_loader, model, model_name, n_classes):
+    aves_keys = ['vl', 'va', 'vim', 'vic']
+    aves = {k: utils.metrics.MetricTracker() for k in aves_keys}
+
+    model.eval()
+    # iterate over data
+    for idx, img_data in enumerate(tqdm(val_loader)):
+        image, dem, label = img_data[0].cuda(), img_data[1].cuda(), img_data[2].cuda().long()
+        with torch.no_grad():
+            if model_name[:4] == 'mtss':
+                logits = model(image, dem)
+            else:
+                images = torch.cat((image, dem), 1)
+                logits = model(images)
+
+            loss = F.cross_entropy(logits, label)
+            acc = utils.compute_dice_coeff(logits, label, n_classes)
+            iou_mean, iou_cls = utils.compute_jaccard_index(logits, label, n_classes)
+
+        aves['vl'].add(loss.item())
+        aves['va'].add(acc)
+        aves['vim'].add(iou_mean)
+        aves['vic'].add([*(iou_cls.values())])
+
+    return aves
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', default='configs/train_mtss.yaml')
+    parser.add_argument('--name', default=None)
+    parser.add_argument('--tag', default=None)
+
+    args = parser.parse_args()
+
+    config = yaml.load(open(args.config, 'r'), Loader=yaml.FullLoader)
+    main(config)

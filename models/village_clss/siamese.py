@@ -1,122 +1,13 @@
 import torch.nn as nn
 import torchvision
 import torch.nn.functional as F
+from .models import register
 
 
-class Mtvc:
-    """
-    Multimodal traditional village classification(Mtvc) is a models to classify traditional village
-    which has specific landscape relationship in China.It carries out classify by sending remote sensing
-    image and DEM data into a sementic segmentation models named Mtsn to get the feature of landscape
-    elements.Then, we classify the feature through the classification models to get the village type.
-
-    多模态传统村落分类网络是一个根据中国传统村落特殊的山水关系对村落类型进行分类的网络，它通过将村落的遥感影像和
-    DEM数据送入一个Mtts语义分割网络得到山水要素的特征图，随后将其送入分类网络得到村落类型
-
-    Arguments:
-        embedding(nn.Module):the models used to extract the represtation from feature map
-        n_classed: the number of classes
-    """
-    pass
-
-
-def _load_ClasModel(arch_type, embedding_name, num_classes):
-    """
-    村落分类模型加载
-    """
-    # create embedding_net
-    if embedding_name == 'embeddingNet':
-        embedding_net = EmbeddingNet()
-    elif embedding_name == 'embeddingResNet':
-        embedding_net = EmbeddingResNet()
-    else:
-        raise ValueError("embedding_name error!Please check and try again!")
-    # create model
-    if arch_type == 'classificationNet':
-        model = ClassificationNet(embedding_net, num_classes)
-    elif arch_type == 'siameseNetwork':
-        model = SiameseNet(embedding_net)
-    elif arch_type == 'tripletNetwork':
-        model = TripletNet(embedding_net)
-    elif arch_type == 'onlinePairSelection':
-        model = embedding_net
-    elif arch_type == 'onlineTripletSelection':
-        model = embedding_net
-    else:
-        raise ValueError("arch_type error!Please check and try again!")
-    return model
-
-
-
-# Classification model
-# Mtvc Baseline: classification with softmax
-def classificationNet(embedding_name, num_classes=6):
-    """Constructs a Mtvc classification with softmax"""
-    return _load_ClasModel('classificationNet', embedding_name, num_classes=num_classes)
-
-
-# siamese
-def siameseNetwork(embedding_name, num_classes=6):
-    """Constructs a Mtvc model with embedding Network"""
-    return _load_ClasModel('siameseNetwork', embedding_name, num_classes=num_classes)
-
-
-# triplet
-def tripletNetwork(embedding_name, num_classes=6):
-    """Constructs a Mtvc model with embedding Network"""
-    return _load_ClasModel('tripletNetwork', embedding_name, num_classes=num_classes)
-
-
-# onlinePairSelection
-def onlinePairSelection(embedding_name, num_classes=6):
-    """Constructs a Mtvc model with embedding Network"""
-    return _load_ClasModel('onlinePairSelection', embedding_name, num_classes=num_classes)
-
-
-# onlineTripletSelection
-def onlineTripletSelection(embedding_name, num_classes=6):
-    """Constructs a Mtvc model with embedding Network"""
-    return _load_ClasModel('onlineTripletSelection', embedding_name, num_classes=num_classes)
-
-
-
-
-class EmbeddingResNet(nn.Module):
-    def __init__(self, pretrained=True):
-        super(EmbeddingResNet, self).__init__()
-        model_resnet18 = torchvision.models.resnet18(pretrained=True)
-        # 更改resnet18第一层的输入通道数
-        self.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-        self.bn1 = model_resnet18.bn1
-        self.relu = model_resnet18.relu
-        self.maxpool = model_resnet18.maxpool
-        self.layer1 = model_resnet18.layer1
-        self.layer2 = model_resnet18.layer2
-        self.layer3 = model_resnet18.layer3
-        self.layer4 = model_resnet18.layer4
-        self.avgpool = model_resnet18.avgpool
-        self.__in_features = model_resnet18.fc.in_features
-        self.fc = nn.Linear(self.__in_features, 2)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        return x
-
-
-class _block(nn.Sequential):
+class Block(nn.Sequential):
     def __init__(self, in_planes, out_planes, kernel_size=3, stride=2):
         padding = (kernel_size - 1) // 2
-        super(_block, self).__init__(
+        super(Block, self).__init__(
             nn.Conv2d(in_planes, out_planes, kernel_size, padding=padding),
             nn.ReLU(inplace=True),
             nn.Conv2d(out_planes, out_planes, kernel_size, padding=padding),
@@ -138,7 +29,7 @@ class EmbeddingNet(nn.Module):
         ]
         features = []
         for i, o, k, s in net_para:
-            features.append(_block(i, o, k, s))
+            features.append(Block(i, o, k, s))
 
         # self.up = nn.Upsample((100,100))
         self.features = nn.Sequential(*features)
@@ -172,6 +63,38 @@ class EmbeddingNetL2(EmbeddingNet):
 
     def get_embedding(self, x):
         return self.forward(x)
+
+
+class EmbeddingResNet(nn.Module):
+    def __init__(self, pretrained=True):
+        super(EmbeddingResNet, self).__init__()
+        model_resnet18 = torchvision.models.resnet18(pretrained=True)
+        # 更改resnet18第一层的输入通道数
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+        self.bn1 = model_resnet18.bn1
+        self.relu = model_resnet18.relu
+        self.maxpool = model_resnet18.maxpool
+        self.layer1 = model_resnet18.layer1
+        self.layer2 = model_resnet18.layer2
+        self.layer3 = model_resnet18.layer3
+        self.layer4 = model_resnet18.layer4
+        self.avgpool = model_resnet18.avgpool
+        self.__in_features = model_resnet18.fc.in_features
+        self.fc = nn.Linear(self.__in_features, 2)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
 
 
 class ClassificationNet(nn.Module):
@@ -219,3 +142,67 @@ class TripletNet(nn.Module):
 
     def get_embedding(self, x):
         return self.embedding_net(x)
+
+
+def _load_ClasModel(arch_type, embedding_name, num_classes):
+    """
+    村落分类模型加载
+    """
+    # create embedding_net
+    if embedding_name == 'embeddingNet':
+        embedding_net = EmbeddingNet()
+    elif embedding_name == 'embeddingResNet':
+        embedding_net = EmbeddingResNet()
+    else:
+        raise ValueError("embedding_name error!Please check and try again!")
+    # create model
+    if arch_type == 'classificationNet':
+        model = ClassificationNet(embedding_net, num_classes)
+    elif arch_type == 'siameseNetwork':
+        model = SiameseNet(embedding_net)
+    elif arch_type == 'tripletNetwork':
+        model = TripletNet(embedding_net)
+    elif arch_type == 'onlinePairSelection':
+        model = embedding_net
+    elif arch_type == 'onlineTripletSelection':
+        model = embedding_net
+    else:
+        raise ValueError("arch_type error!Please check and try again!")
+    return model
+
+
+# Classification model
+# Mtvc Baseline: classification with softmax
+@register('classificationNet')
+def classificationNet(embedding_name, num_classes=6):
+    """Constructs a Mtvc classification with softmax"""
+    return _load_ClasModel('classificationNet', embedding_name, num_classes=num_classes)
+
+
+# siamese
+@register('siameseNetwork')
+def siameseNetwork(embedding_name, num_classes=6):
+    """Constructs a Mtvc model with embedding Network"""
+    return _load_ClasModel('siameseNetwork', embedding_name, num_classes=num_classes)
+
+
+# triplet
+@register('tripletNetwork')
+def tripletNetwork(embedding_name, num_classes=6):
+    """Constructs a Mtvc model with embedding Network"""
+    return _load_ClasModel('tripletNetwork', embedding_name, num_classes=num_classes)
+
+
+# onlinePairSelection
+@register('onlinePairSelection')
+def onlinePairSelection(embedding_name, num_classes=6):
+    """Constructs a Mtvc model with embedding Network"""
+    return _load_ClasModel('onlinePairSelection', embedding_name, num_classes=num_classes)
+
+
+# onlineTripletSelection
+@register('onlineTripletSelection')
+def onlineTripletSelection(embedding_name, num_classes=6):
+    """Constructs a Mtvc model with embedding Network"""
+    return _load_ClasModel('onlineTripletSelection', embedding_name, num_classes=num_classes)
+

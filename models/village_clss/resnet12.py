@@ -60,7 +60,7 @@ class ResNet12(nn.Module):
     def __init__(self, channels):
         super().__init__()
 
-        self.inplanes = 3
+        self.inplanes = 1
 
         self.layer1 = self._make_layer(channels[0])
         self.layer2 = self._make_layer(channels[1])

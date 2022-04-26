@@ -4,6 +4,7 @@ from torchvision import models
 import torch.nn.functional as F
 
 from functools import partial
+from .models import register
 
 nonlinearity = partial(F.relu, inplace=True)
 
@@ -33,6 +34,7 @@ class Dblock(nn.Module):
         return out
 
 
+@register('d-unet')
 class Dunet(nn.Module):
     def __init__(self):
         super(Dunet, self).__init__()

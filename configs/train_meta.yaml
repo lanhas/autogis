@@ -1,0 +1,30 @@
+train_dataset: village-clss
+train_dataset_args: {root_path: F:\Dataset\tradition_villages_old\Classification, split: train}
+train_fs_args:
+    n_way: 2
+    n_shot: 1
+    n_query: 1
+    ep_per_batch: 1
+    batch_size: 2
+
+val_dataset: village-clss
+val_dataset_args: {root_path: F:\Dataset\tradition_villages_old\Classification, split: val}
+val_fs_args:
+    n_way: 2
+    n_shot: 1
+    n_query: 1
+    ep_per_batch: 1
+    batch_size: 2
+
+model: meta-baseline
+model_args:
+    encoder: resnet12
+    encoder_args: {}
+load_encoder: ./save/village_clss-classifier_resnet12/max-va.pth
+
+
+
+max_epoch: 20
+optimizer: adam
+optimizer_args: {lr: 1.e-3, weight_decay: 5.e-4, milestones:[50]}
+num_workers: 0

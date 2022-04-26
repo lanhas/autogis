@@ -2,3 +2,9 @@ train dataset: torch.Size([1, 256, 256]) (x181), 6
 val dataset: torch.Size([1, 256, 256]) (x47), 6
 fs dataset: torch.Size([1, 256, 256]) (x47), 6
 num params: 8.0M
+train loss: 1.3934 | train acc: 0.5330
+val loss: 2.1216 | val acc: 0.1875
+time epoch:18.0s, time used:18.0s/22.5m
+train loss: 1.1331 | train acc: 0.5934
+val loss: 0.9574 | val acc: 0.7500
+time epoch:13.0s, time used:31.3s/19.6m

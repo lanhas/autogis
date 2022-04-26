@@ -2,12 +2,12 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from collections import OrderedDict
-from backbone import resnet, mobilenetv2
+
+import models.village_segm as models
+from .models import register
 
 
-__all__ = ["Mtss", "MtssHead", "ElevationProcess", "convert_to_separable_conv"]
-
-
+@register('mtss')
 class Mtss(nn.Module):
     """
     Multimodel terrain Semantic segmentation(Mtss) is a models to Semantic
@@ -16,35 +16,41 @@ class Mtss(nn.Module):
 
     多模态双阶段地形要素语义分割网络是一个针对地理信息要素设计的语义分割网络，它利用遥感影像
     和DEM数据共同构成特征进行地形要素识别
-
-    Arguments:
-        backbone (nn.Module): the models used to compute the features for the model.
-            The backbone should return an OrderedDict[Tensor], with the key being
-            "out" for the last feature map used, and "aux" if an auxiliary classifier
-            is used.
-        elevation (nn.Module): module that take the "out" element return from backbone
-            and elevation return a sense prediction.
-        segmentation (nn.Module): module that takes the "out" element returned from
-            the backbone and returns a dense prediction.
-
-        backbone (nn.Module): 主干网络用于从遥感影像计算特征，它返回一个有序字典OrderedDict[Tensor]，
-            键值对为out表示最后使用的特征映射，aux为辅助分类器
-        elevation (nn.Module): 高程网络用于从DEM中计算特征，辅助主干网络进行要素划分
-        segmentation (nn.Module): 将主干网络和高程网络进行特征融合从而进行分类
     """
 
-    def __init__(self, backbone, elevation, segmention):
+    def __init__(self, encoder, encoder_args, classifier_args):
         super(Mtss, self).__init__()
-        self.backbone = backbone
-        self.elevation = elevation
-        self.segmention = segmention
+
+        if encoder == 'mobilenet':
+            inplanes = 320
+            low_level_planes = 24
+            return_layers = {'high_level_features': 'out', 'low_level_features': 'low_level'}
+            backbone = models.make(encoder, **encoder_args)
+        elif encoder[:6] == 'resnet':
+            inplanes = 2048
+            low_level_planes = 256
+            return_layers = {'layer4': 'out', 'layer1': 'low_level'}
+            backbone = models.make(encoder, **encoder_args)
+        else:
+            raise ValueError('encoder name error! please check!')
+        elvational_planes = 24
+
+        if encoder_args['output_stride'] == 8:
+            aspp_dilate = [12, 24, 36]
+        else:
+            aspp_dilate = [6, 12, 18]
+
+        self.elevation = ElevationProcess()
+        self.encoder = IntermediateLayerGetter(backbone, return_layers=return_layers)
+        self.classifier = MtssHead(inplanes, low_level_planes, elvational_planes,
+                                   classifier_args['n_classes'], aspp_dilate)
 
     def forward(self, x, y):
         # x:遥感数据 y:高程数据
         input_shape = x.shape[-2:]
-        features_rs = self.backbone(x)
+        features_rs = self.encoder(x)
         features_el = self.elevation(y)
-        x = self.segmention(features_rs, features_el)
+        x = self.classifier(features_rs, features_el)
         x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
         return x
 
@@ -81,127 +87,6 @@ class IntermediateLayerGetter(nn.ModuleDict):
                 out_name = self.return_layers[name]
                 out[out_name] = x
         return out
-
-
-def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_backbone):
-    """
-    基于resnet的语义分割
-
-    Parameters
-    ----------
-    name: str
-        {"deeplabv3plus", "mtss"}optional
-        deeplabv3plus：deeplabv3plus
-        mtss：多模态地形要素语义分割
-    backbone_name: str
-        {"resnet50", "resnet101"}optional
-    numclass: int
-        需要分类的种类数量
-    output_stride: int
-        输出特征图与输入特征图之间的比值
-    pretrained_backbone: bool
-        是否使用预训练模型
-    """
-    if output_stride == 8:
-        replace_stride_with_dilation = [False, True, True]
-        aspp_dilate = [12, 24, 36]
-    else:
-        replace_stride_with_dilation = [False, False, True]
-        aspp_dilate = [6, 12, 18]
-
-    backbone = resnet.__dict__[backbone_name](
-        pretrained=pretrained_backbone,
-        replace_stride_with_dilation=replace_stride_with_dilation)
-
-    inplanes = 2048
-    low_level_planes = 256
-
-    return_layers = {'layer4': 'out', 'layer1': 'low_level'}
-
-    # 多模态输入
-    elvational_planes = 24
-    elevation = ElevationProcess()
-    backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
-    classifier_segm = MtssHead(inplanes, low_level_planes, elvational_planes, num_classes, aspp_dilate)
-    model = Mtss(backbone, elevation, classifier_segm)
-    return model
-
-
-def _segm_mobilenet(name, backbone, num_classes, output_stride, pretrained_backbone):
-    """
-    基于mobilenet的语义分割
-
-    Parameters
-    ----------
-    name: str
-        {"deeplabv3plus","mtss"}optional
-        deeplabv3plus：deeplabv3plus
-        mtss：多模态地形要素语义分割
-    numclass: int
-        需要分类的种类数量
-    output_stride: int
-        输出特征图与输入特征图之间的比值
-    pretrained_backbone: bool
-        是否使用预训练模型
-    """
-    if output_stride == 8:
-        aspp_dilate = [12, 24, 36]
-    else:
-        aspp_dilate = [6, 12, 18]
-
-    backbone = mobilenetv2.mobilenet_v2(pretrained=pretrained_backbone, output_stride=output_stride)
-
-    backbone.low_level_features = backbone.features[0:4]
-    backbone.high_level_features = backbone.features[4:-1]
-    backbone.features = None
-    backbone.classifier = None
-    inplanes = 320
-    low_level_planes = 24
-    return_layers = {'high_level_features': 'out', 'low_level_features': 'low_level'}
-    backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
-
-    # 多模态输入
-    elvational_planes = 24
-    elevation = ElevationProcess()
-    classifier_segm = MtssHead(inplanes, low_level_planes, elvational_planes, num_classes, aspp_dilate)
-    model = Mtss(backbone, elevation, classifier_segm)
-    return model
-
-
-def _load_segmModel(arch_type, backbone, num_classes, output_stride, pretrained_backbone):
-    """
-    地理要素语义分割模型加载
-    Parameters
-    ----------
-    arch_type: str
-        {"deeplabv3plus", "mtss"}optional
-    backbone: str
-        {"resnet50", "resnet101", "mobilenet"}optional
-    num_class: int
-    output_stride: int
-        输入特征图与输出特征图的大小比值
-    pretrained_backbone: bool
-        是否使用ImageNet预训练模型
-    """
-    if arch_type == "deeplabv3plus":
-        if backbone == 'mobilenetv2':
-            model = _segm_mobilenet(arch_type, backbone, num_classes, output_stride=output_stride,
-                                    pretrained_backbone=pretrained_backbone)
-        elif backbone.startswith('resnet'):
-            model = _segm_resnet(arch_type, backbone, num_classes, output_stride=output_stride,
-                                 pretrained_backbone=pretrained_backbone)
-        else:
-            raise NotImplementedError
-    elif arch_type == "mtss":
-        if backbone == "mobilenetv2":
-            model = _segm_mobilenet(arch_type, backbone, num_classes, output_stride=output_stride,
-                                    pretrained_backbone=pretrained_backbone)
-        elif backbone.startswith('resnet'):
-            model = _segm_resnet(arch_type, backbone, num_classes, output_stride=output_stride,
-                                 pretrained_backbone=pretrained_backbone)
-        else:
-            raise NotImplementedError
-    return model
 
 
 class MtssHead(nn.Module):
@@ -263,7 +148,7 @@ class ElevationProcess(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-    def forward(self,x):
+    def forward(self, x):
         x = self.conv1(x)
         x = self.conv2(x)
         return x
@@ -365,40 +250,3 @@ def convert_to_separable_conv(module):
     for name, child in module.named_children():
         new_module.add_module(name, convert_to_separable_conv(child))
     return new_module
-
-
-# Segmentation model
-
-# mtss
-def mtss_resnet50(num_classes=7, output_stride=16, pretrained_backbone=True):
-    """Constructs a Mtss model with a ResNet-50 backbone.
-
-    Args:
-        num_classes (int): number of classes.
-        output_stride (int): output stride for deeplab.
-        pretrained_backbone (bool): If True, use the pretrained backbone.
-    """
-    return _load_segmModel('mtss', 'resnet50', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
-
-
-def mtss_resnet101(num_classes=7, output_stride=16, pretrained_backbone=True):
-    """Constructs a Mtss model with a ResNet-101 backbone.
-
-    Args:
-        num_classes (int): number of classes.
-        output_stride (int): output stride for deeplab.
-        pretrained_backbone (bool): If True, use the pretrained backbone.
-    """
-    return _load_segmModel('mtss', 'resnet101', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
-
-
-def mtss_mobilenet(num_classes=7, output_stride=16, pretrained_backbone=True):
-    """Constructs a Mtss model with a MobileNetv2 backbone.
-
-    Args:
-        num_classes (int): number of classes.
-        output_stride (int): output stride for deeplab.
-        pretrained_backbone (bool): If True, use the pretrained backbone.
-    """
-    return _load_segmModel('mtss', 'mobilenetv2', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
-

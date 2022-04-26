@@ -2,9 +2,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from collections import OrderedDict
-
-
-__all__ = ["DeepLabV3", "DeepLabHeadV3Plus", ]
+from . import resnet
+from . import mobilenetv2
 
 
 class DeepLabV3(nn.Module):

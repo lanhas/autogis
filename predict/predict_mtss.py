@@ -1,10 +1,10 @@
 import torch
-import network
+import models.village_segm as models
 import numpy as np
 from tqdm import tqdm
 from PIL import Image
 from pathlib import Path
-from datasets.mtsd import villageFactorsSegm
+from datasets.village_segm import VillageSegm
 
 # -----------------------------------------------------------------#
 #                     mask color                                   #
@@ -20,7 +20,7 @@ from datasets.mtsd import villageFactorsSegm
 
 
 def main():
-    model_name = 'mtss_resnet50'
+    model_name = 'mtss'
     ckpt = Path(r'checkpoints/mtss/best-mtss_resnet50-loss_0.2928-Acc_0.9008-IoU_0.7003-Epoch_42.pth')
     remote_data = Path(r'F:\Dataset\tradition_villages_old\Segmentation\JPEGImages')
     dem_data = Path(r'F:\Dataset\tradition_villages_old\Segmentation\DEMImages')
@@ -40,17 +40,17 @@ def main():
 
     # setup model
     model_map = {
-        'mtss_resnet50': network.mtss_resnet50,
-        'mtss_resnet101': network.mtss_resnet101,
-        'mtss_mobilenet': network.mtss_mobilenet,
-        'deeplabv3plus_resnet50': network.deeplabv3plus_resnet50,
-        'deeplabv3plus_resnet101': network.deeplabv3plus_resnet101,
-        'deeplabv3plus_mobilenet': network.deeplabv3plus_mobilenet
+        'mtss_resnet50': models.mtss_resnet50,
+        'mtss_resnet101': models.mtss_resnet101,
+        'mtss_mobilenet': models.mtss_mobilenet,
+        'deeplabv3plus_resnet50': models.deeplabv3plus_resnet50,
+        'deeplabv3plus_resnet101': models.deeplabv3plus_resnet101,
+        'deeplabv3plus_mobilenet': models.deeplabv3plus_mobilenet
     }
 
     model = model_map[model_name](num_classes=num_classes, output_stride=output_stride).to(device)
     if separable_conv:
-        network.convert_to_separable_conv(model.classifier)
+        models.convert_to_separable_conv(model.classifier)
 
     if ckpt.is_file():
         print("=> loading checkpoint '{}".format(ckpt))
@@ -60,7 +60,7 @@ def main():
         print("=> no checkpoint found at '{}'".format(ckpt))
 
     # decode function
-    decode_fn = villageFactorsSegm.decode_target
+    decode_fn = VillageSegm.decode_target
 
     check_base_name = ckpt.stem
     save_subdir = save_dir / check_base_name

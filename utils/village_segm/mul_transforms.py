@@ -9,6 +9,7 @@ from PIL import Image
 #  Extended Transforms for Multimodel Semantic Segmentation
 #
 
+
 class ExtCompose(object):
     """Composes several transforms together.
     Args:
@@ -36,6 +37,7 @@ class ExtCompose(object):
         format_string += '\n)'
         return format_string
 
+
 class ExtRandomHorizontalFlip(object):
     """Horizontally flip the given PIL Image randomly with a given probability.
 
@@ -61,6 +63,7 @@ class ExtRandomHorizontalFlip(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
+
 
 class ExtCenterCrop(object):
     """Crops the given PIL Image at the center.
@@ -111,6 +114,7 @@ class ExtRandomScale(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(size={0})'.format(self.size)
+
 
 class ExtScale(object):
     """Resize the input PIL Image to the given scale.
@@ -208,6 +212,7 @@ class ExtRandomRotation(object):
         format_string += ')'
         return format_string
 
+
 class ExtRandomHorizontalFlip(object):
     """Horizontally flip the given PIL Image randomly with a given probability.
     Args:
@@ -257,6 +262,7 @@ class ExtRandomVerticalFlip(object):
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
+
 class ExtPad(object):
     def __init__(self, diviser=32):
         self.diviser = diviser
@@ -269,6 +275,7 @@ class ExtPad(object):
         dem = F.pad(dem, ( pw//2, pw-pw//2, ph//2, ph-ph//2) )
         lbl = F.pad(lbl, ( pw//2, pw-pw//2, ph//2, ph-ph//2))
         return im, lbl
+
 
 class ExtToTensor(object):
     """Convert a ``PIL Image`` or ``numpy.ndarray`` to tensor.
@@ -296,6 +303,7 @@ class ExtToTensor(object):
     def __repr__(self):
         return self.__class__.__name__ + '()'
 
+
 class ExtNormalize(object):
     """Normalize a tensor image with mean and standard deviation.
     Given mean: ``(M1,...,Mn)`` and std: ``(S1,..,Sn)`` for ``n`` channels, this transform
@@ -306,11 +314,11 @@ class ExtNormalize(object):
         std (sequence): Sequence of standard deviations for each channel.
     """
 
-    def __init__(self, mean_image, std_image, mean_dem, std_dem):
-        self.mean_image = mean_image
-        self.std_image = std_image
-        self.mean_dem = mean_dem
-        self.std_dem = std_dem
+    def __init__(self, mean_r, std_r, mean_d, std_d):
+        self.mean_image = mean_r
+        self.std_image = std_r
+        self.mean_dem = mean_d
+        self.std_dem = std_d
 
     def __call__(self, image, dem, lbl):
         """
@@ -324,9 +332,6 @@ class ExtNormalize(object):
             lbl: Unchanged Tensor label
         """
         return F.normalize(image, self.mean_image, self.std_image), F.normalize(dem, self.mean_dem, self.std_dem), lbl
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
 
 class ExtRandomCrop(object):

@@ -22,8 +22,8 @@ num_workers: 0
 optimizer: adam
 optimizer_args:
   lr: 0.001
-  lr_policy: step_lr
-  step_size: 12
+  milestones:
+  - 50
   weight_decay: 0.0005
 train_dataset: village-clss
 train_dataset_args:

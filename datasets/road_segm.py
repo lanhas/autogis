@@ -1,40 +1,45 @@
-
-import os
-import numpy as np
+import torch
+import torch.utils.data as data
 from PIL import Image
 from pathlib import Path
-import torch.utils.data as data
+from torchvision import transforms
+
+from .datasets import register
+from utils import ext_transforms as et
 
 
+@register('road-segm')
 class RoadSegm(data.Dataset):
     """deep globe dataset"""
-    def __init__(self, root_dir, status='train', transform=None):
-        self.status = status
-        self.root_dir = Path(root_dir)
-        self.transform = transform
-        self.sat_img_names = list(filter(lambda x: '_sat' in x, os.listdir(self.root_dir / self.status)))
+    def __init__(self, root_path, split='train', **kwargs):
+        root_path = Path(root_path)
+        self.sat_img_names = list(filter(lambda x: '_sat' in str(x), (root_path / split).iterdir()))
+        self.mask_img_names = list(filter(lambda x: '_mask' in str(x), (root_path / split).iterdir()))
+        assert (len(self.sat_img_names) == len(self.mask_img_names))
+
+        norm_params = {'mean': [],
+                       'std': []}
+        crop_size = 256
+        normalize = transforms.Normalize(**norm_params)
+        self.default_transform = et.ExtCompose([
+            et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
+            et.ExtRandomHorizontalFlip(),
+            et.ExtToTensor(),
+        ])
+        augment = kwargs.get('augment')
+        if augment is None:
+            self.transform = self.default_transform
+
+        def convert_raw(x):
+            mean = torch.tensor(norm_params['mean']).view(3, 1, 1).type_as(x)
+            std = torch.tensor(norm_params['std']).view(3, 1, 1).type_as(x)
+            return x * std + mean
+        self.convert_raw = convert_raw
 
     def __getitem__(self, index):
-        sat_img_nm = self.sat_img_names[index]
-        mask_img_nm = self.sat_img_names[index].split('_')[0] + '_mask.png'
-
-        sat_img_path = self.root_dir / self.status / sat_img_nm
-        mask_img_path = self.root_dir / self.status / mask_img_nm
-
-        sat_img = Image.open(sat_img_path).convert('RGB')
-        mask_img = Image.open(mask_img_path).convert('L')
-
-        mask = np.zeros_like(mask_img, np.uint8)
-        # since it is not exactly 255 for road area, binarize at 128
-        # mask[np.where(np.all(mask_img==(255,255,255), axis=-1))] = 1
-        mask[np.array(mask_img, np.uint8) >= 128] = 1
-        mask = Image.fromarray(mask).convert('L')
-        # sample = {'sat_img': sat_img, 'map_img': mask}
-        
-        if self.transform:
-            sample = self.transform(sat_img, mask)
-
-        return sample
+        image = Image.open(self.sat_img_names[index])
+        label = Image.open(self.mask_img_names[index])
+        return self.transform(image, label.convert('1'))
 
     def __len__(self):
         return len(self.sat_img_names)

@@ -1,6 +1,6 @@
 import torch
-import network
 import numpy as np
+import models.road_segm as models
 from tqdm import tqdm
 from PIL import Image
 from pathlib import Path
@@ -22,9 +22,9 @@ def main():
 
     # setup model
     model_map = {
-        'unet': network.unet,
-        'unet_small': network.unet_small,
-        'dense_unet': network.dense_unet,
+        'unet': models.road_segm.unet,
+        'unet_small': models.unet_small,
+        'dense_unet': models.dense_unet,
     }
     model = model_map[model_name]().to(device)
 

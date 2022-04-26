@@ -1,19 +1,19 @@
 import argparse
-import os
 import yaml
 
 import torch
-import models
 import torch.nn as nn
 import numpy as np
-import utils
-from utils import metrics
-from torchvision import transforms as T
-from torch.utils import data
-from utils.visualizer import Visualizer
-from datasets.village_clss import Mtvcd, SiameseMtvcd, BalancedBatchSampler, TripletMtvcd
 from tqdm import tqdm
 from pathlib import Path
+from torchvision import transforms as T
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+
+
+import utils
+import models.village_clss as models
+from utils import metrics
 
 
 def get_dataset(data_root, arch_type='siamese', crop_size=512):
@@ -49,6 +49,16 @@ def get_dataset(data_root, arch_type='siamese', crop_size=512):
 
 
 def main(config):
+    svname = args.name
+    if svname is None:
+        svname = config['model'] + '_' + config['model_args']['encoder']
+    if args.tag is not None:
+        svname += '_' + args.tag
+
+    save_path = Path.cwd() / 'save' / svname
+    utils.ensure_path(save_path)
+    utils.set_log_path(save_path)
+
     # 超参数设置
     start_epoch = 1
     config['epochs'] = 75
@@ -289,11 +299,13 @@ def save_checkpoint(state, is_best, name):
         filename_best.write_bytes(filename.read_bytes())
 
 
-if __name__ == "__main__":
-    parse = argparse.ArgumentParser()
-    parse.add_argument('--config')
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', default='configs/train_mtss.yaml')
+    parser.add_argument('--name', default=None)
+    parser.add_argument('--tag', default=None)
 
-    args = parse.parse_args()
+    args = parser.parse_args()
 
     config = yaml.load(open(args.config, 'r'), Loader=yaml.FullLoader)
     main(config)

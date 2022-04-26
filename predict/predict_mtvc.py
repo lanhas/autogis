@@ -1,9 +1,10 @@
-import network
-import torch
 import os
+import torch
 import numpy as np
+import models.village_clss as models
+
 from torch.utils import data
-from datasets.mtvcd import Mtvcd
+from datasets.village_clss import VillageClss
 import torchvision.transforms as T
 import matplotlib.pyplot as plt
 
@@ -27,10 +28,10 @@ def get_dataset(data_root, crop_size=512):
                     std=[0.229]),
     ])
     # 分类网络数据集
-    train_dst = Mtvcd(root_mtvcd=data_root,
-                      image_set="train", transform=train_transform)
-    val_dst = Mtvcd(root_mtvcd=data_root,
-                    image_set="val", transform=val_transform)
+    train_dst = VillageClss(root_mtvcd=data_root,
+                            split="train", transform=train_transform)
+    val_dst = VillageClss(root_mtvcd=data_root,
+                          split="val", transform=val_transform)
     return train_dst, val_dst
 
 
@@ -81,11 +82,11 @@ def main():
     test_loader = data.DataLoader(test_dst, batch_size=batch_size, shuffle=True)
     # set up model
     model_map = {
-        'classificationNet': network.classificationNet,
-        'siameseNetwork': network.siameseNetwork,
-        'tripletNetwork': network.tripletNetwork,
-        'onlinePairSelection': network.onlinePairSelection,
-        'onlineTripletSelection': network.onlineTripletSelection,
+        'classificationNet': models.classificationNet,
+        'siameseNetwork': models.siameseNetwork,
+        'tripletNetwork': models.tripletNetwork,
+        'onlinePairSelection': models.onlinePairSelection,
+        'onlineTripletSelection': models.onlineTripletSelection,
     }
     model = model_map[model_name](embedding_name)
     if ckpt is not None:
