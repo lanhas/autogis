@@ -46,7 +46,7 @@ def main(config):
                               num_workers=config['num_workers'], pin_memory=True)
 
     utils.log('train dataset: {} (x{}), {}'.format(
-            train_dataset[0][0].shape, len(train_dataset),
+            torch.cat((train_dataset[0][0], train_dataset[1][0]), dim=0).shape, len(train_dataset),
             train_dataset.n_classes))
 
     if config.get('visualize_datasets'):
@@ -60,7 +60,7 @@ def main(config):
         val_loader = DataLoader(val_dataset, config['batch_size'],
                                 num_workers=config['num_workers'], pin_memory=True)
         utils.log('val dataset: {} (x{}), {}'.format(
-                val_dataset[0][0].shape, len(val_dataset),
+                torch.cat((val_dataset[0][0], val_dataset[1][0]), dim=0).shape, len(val_dataset),
                 val_dataset.n_classes))
         if config.get('visualize_datasets'):
             utils.visualize_dataset(val_dataset, 'val_dataset', writer)
@@ -78,7 +78,7 @@ def main(config):
         fs_dataset = datasets.make(config['fs_dataset'],
                                    **config['fs_dataset_args'])
         utils.log('fs dataset: {} (x{}), {}'.format(
-            fs_dataset[0][0].shape, len(fs_dataset),
+            torch.cat((fs_dataset[0][0], fs_dataset[1][0]), dim=0).shape, len(fs_dataset),
             fs_dataset.n_classes))
         if config.get('visualize_datasets'):
             utils.visualize_dataset(fs_dataset, 'fs_dataset', writer)
@@ -204,10 +204,12 @@ def train(train_loader, model, optimizer):
     model.train()
     # iterate over data
     for idx, img_data in enumerate(tqdm(train_loader)):
-        images = img_data[0].cuda()
-        labels = img_data[1].cuda().long()
+        data_r = img_data[0].cuda()
+        data_d = img_data[1].cuda()
+        labels = img_data[2].cuda().long()
 
-        logits = model(images)
+        data = torch.cat((data_r, data_d.unsqueeze(1)), dim=1)
+        logits = model(data)
 
         loss = F.cross_entropy(logits, labels)
         acc = utils.compute_acc(logits, labels)
@@ -229,10 +231,13 @@ def validate(valid_loader, model):
     model.eval()
     # Iterate over Data
     for img_data in tqdm(valid_loader):
-        images = img_data[0].cuda()
-        labels = img_data[1].cuda().long()
+        data_r = img_data[0].cuda()
+        data_d = img_data[1].cuda()
+        labels = img_data[2].cuda().long()
+
+        data = torch.cat((data_r, data_d.unsqueeze(1)), dim=1)
         with torch.no_grad():
-            logits = model(images)
+            logits = model(data)
 
             loss = F.cross_entropy(logits, labels)
             acc = utils.compute_acc(logits, labels)
@@ -248,8 +253,10 @@ def validate_fs(fs_loader, fs_model, fs_args_val):
 
     fs_model.eval()
     np.random.seed(0)
-    for data, _ in tqdm(fs_loader,
+    for data_r, data_d, _ in tqdm(fs_loader,
                         desc='fs-' + str(fs_args_val['n_shot']), leave=False):
+
+        data = torch.cat((data_r, data_d.unsqueeze(1)), dim=1)
         x_shot, x_query = fs.split_shot_query(
             data.cuda(), fs_args_val['n_way'], fs_args_val['n_shot'],
             fs_args_val['n_query'], ep_per_batch=fs_args_val['ep_per_batch'])
@@ -265,7 +272,7 @@ def validate_fs(fs_loader, fs_model, fs_args_val):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='configs/train_classifier.yaml')
+    parser.add_argument('--config', default='configs/train_classifier_mul.yaml')
     parser.add_argument('--name', default=None)
     parser.add_argument('--tag', default=None)
 

@@ -172,7 +172,7 @@ class ExtRandomRotation(object):
                 raise ValueError("If degrees is a sequence, it must be of len 2.")
             self.degrees = degrees
 
-        self.resample = resample
+        self.resample = InterpolationMode.NEAREST
         self.expand = expand
         self.center = center
 
@@ -197,16 +197,16 @@ class ExtRandomRotation(object):
 
         angle = self.get_params(self.degrees)
 
-        return F.rotate(img, angle, self.resample, self.expand, self.center), F.rotate(lbl, angle, self.resample, self.expand, self.center)
+        return F.rotate(img, angle, self.resample, self.expand, self.center, 0), F.rotate(lbl, angle, self.resample, self.expand, self.center, 0)
 
-    def __repr__(self):
-        format_string = self.__class__.__name__ + '(degrees={0}'.format(self.degrees)
-        format_string += ', resample={0}'.format(self.resample)
-        format_string += ', expand={0}'.format(self.expand)
-        if self.center is not None:
-            format_string += ', center={0}'.format(self.center)
-        format_string += ')'
-        return format_string
+    # def __repr__(self):
+    #     format_string = self.__class__.__name__ + '(degrees={0}'.format(self.degrees)
+    #     format_string += ', resample={0}'.format(self.resample)
+    #     format_string += ', expand={0}'.format(self.expand)
+    #     if self.center is not None:
+    #         format_string += ', center={0}'.format(self.center)
+    #     format_string += ')'
+    #     return format_string
 
 
 class ExtRandomHorizontalFlip(object):
@@ -229,8 +229,8 @@ class ExtRandomHorizontalFlip(object):
             return F.hflip(img), F.hflip(lbl)
         return img, lbl
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
+    # def __repr__(self):
+    #     return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
 class ExtRandomVerticalFlip(object):

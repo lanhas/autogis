@@ -57,10 +57,10 @@ class Block(nn.Module):
 
 class ResNet12(nn.Module):
 
-    def __init__(self, channels):
+    def __init__(self, inplanes, channels):
         super().__init__()
 
-        self.inplanes = 1
+        self.inplanes = inplanes
 
         self.layer1 = self._make_layer(channels[0])
         self.layer2 = self._make_layer(channels[1])
@@ -97,10 +97,15 @@ class ResNet12(nn.Module):
 
 @register('resnet12')
 def resnet12():
-    return ResNet12([64, 128, 256, 512])
+    return ResNet12(1, [64, 128, 256, 512])
+
+
+@register('resnet12-mul')
+def resnet12_mul():
+    return ResNet12(2, [64, 128, 256, 512])
 
 
 @register('resnet12-wide')
 def resnet12_wide():
-    return ResNet12([64, 160, 320, 640])
+    return ResNet12(1, [64, 160, 320, 640])
 

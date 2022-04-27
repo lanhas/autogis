@@ -27,7 +27,6 @@ optimizer_args:
   weight_decay: 0.0005
 train_dataset: village-clss
 train_dataset_args:
-  augment: flip
   root_path: F:\Dataset\tradition_villages_old\Classification
   split: train
 val_dataset: village-clss

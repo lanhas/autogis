@@ -1,5 +1,5 @@
-import models
+import numpy as np
 
-
-model = models.make('resnet12')
-print(model)
+a = np.arange(4).reshape(2, -1)[np.newaxis, ]
+b = np.random.rand(2, 2)[np.newaxis, ]
+print(np.vstack((a, b)))
