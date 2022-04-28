@@ -5,7 +5,11 @@ from collections import OrderedDict
 from . import resnet
 from . import mobilenetv2
 
+import models.village_segm as models
+from .models import register
 
+
+@register('deeplab-v3p')
 class DeepLabV3(nn.Module):
     """
     Implements DeepLabV3 model from
@@ -22,15 +26,36 @@ class DeepLabV3(nn.Module):
         aux_classifier (nn.Module, optional): auxiliary classifier used during training
     """
 
-    def __init__(self, backbone, segmention):
+    def __init__(self, encoder, encoder_args, classifier_args):
         super(DeepLabV3, self).__init__()
-        self.backbone = backbone
-        self.segmention = segmention
+
+        if encoder == 'mobilenet':
+            inplanes = 320
+            low_level_planes = 24
+            return_layers = {'high_level_features': 'out', 'low_level_features': 'low_level'}
+            backbone = models.make(encoder, **encoder_args)
+        elif encoder[:6] == 'resnet':
+            inplanes = 2048
+            low_level_planes = 256
+            return_layers = {'layer4': 'out', 'layer1': 'low_level'}
+            backbone = models.make(encoder, **encoder_args)
+        else:
+            raise ValueError('encoder name error! please check!')
+
+        if encoder_args['output_stride'] == 8:
+            aspp_dilate = [12, 24, 36]
+        else:
+            aspp_dilate = [6, 12, 18]
+
+        self.encoder = IntermediateLayerGetter(backbone, return_layers=return_layers)
+        self.classifier = DeepLabHeadV3Plus(inplanes, low_level_planes,
+                                   classifier_args['n_classes'], aspp_dilate)
 
     def forward(self, x):
+        # x:遥感数据 y:高程数据
         input_shape = x.shape[-2:]
-        features = self.backbone(x)
-        x = self.segmention(features)
+        features_rs = self.encoder(x)
+        x = self.classifier(features_rs)
         x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
         return x
 
