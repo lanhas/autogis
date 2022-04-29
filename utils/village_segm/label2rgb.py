@@ -1,12 +1,12 @@
 import os
 
 import numpy as np
-import scipy.misc
+from PIL import Image
 from tqdm import tqdm
 
 
 def annotation2color(input_path, output_path):
-    img = scipy.misc.imread(input_path)
+    img = Image.open(input_path)
 
     color = np.zeros((*(2448, 2448), 3), dtype=np.uint8)
 
@@ -18,8 +18,8 @@ def annotation2color(input_path, output_path):
     color[img == 5] = [255, 255, 255]       # 荒地          
     color[img == 6] = [0, 0, 0]             # 未知区域      
 
-    scipy.misc.imsave(output_path, color)
-    pass
+    res = Image.fromarray(color)
+    res.save(output_path)
 
 
 one_channel_label_path = 'datasets/train/landCover_voc/SegmentationClass'

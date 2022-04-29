@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.utils.data as data
 from PIL import Image
@@ -5,6 +6,7 @@ from pathlib import Path
 from torchvision import transforms
 
 from .datasets import register
+from utils.utils import color2annotation
 from utils import ext_transforms as et
 
 
@@ -41,7 +43,9 @@ class RoadSegm(data.Dataset):
     def __getitem__(self, index):
         image = Image.open(self.sat_img_names[index])
         label = Image.open(self.mask_img_names[index])
-        return self.transform(image, label.convert('1'))
+        label = color2annotation(label)
+        a = np.array(label)
+        return self.transform(image, label)
 
     def __len__(self):
         return len(self.sat_img_names)
