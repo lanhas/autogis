@@ -100,7 +100,8 @@ def main(config):
         writer.add_scalars('mean_IoU', {'train': train_score['tim'].get_avg()}, epoch)
         writer.add_scalars('mean_IoU', {'val': val_score['vim'].get_avg()}, epoch)
 
-        classes = ['unknow', 'mountain', 'forest', 'farm', 'water', 'wasteland', 'village']
+        # classes = ['unknow', 'mountain', 'forest', 'farm', 'water', 'wasteland', 'village']
+        classes = ['Urban', 'Agriculture', 'Rangeland', 'Forest', 'Water', 'Barren', 'Unknown']
         [writer.add_scalars(v_class, {'train': train_score['tic'].get_avg()[i]}, epoch) for i, v_class in enumerate(classes)]
         [writer.add_scalars(v_class, {'val': val_score['vic'].get_avg()[i]}, epoch) for i, v_class in enumerate(classes)]
 

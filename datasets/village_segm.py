@@ -62,16 +62,22 @@ class VillageSegm(Dataset):
                        'mean_d': [],
                        'std_d': []}
         normalize = mt.ExtNormalize(**norm_params)
-        self.default_transform = mt.ExtCompose([
+        train_transform = mt.ExtCompose([
             mt.ExtRandomScale((0.5, 2.0)),
             mt.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             mt.ExtRandomHorizontalFlip(),
             mt.ExtToTensor(),
-            # normalize,
         ])
-        augment = kwargs.get('augment')
-        if augment is None:
-            self.transform = self.default_transform
+
+        val_transform = mt.ExtCompose([
+            mt.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
+            mt.ExtToTensor(),
+        ])
+
+        if self.split == "train":
+            self.transform = train_transform
+        else:
+            self.transform = val_transform
 
         def convert_raw(x):
             mean = torch.tensor(norm_params['mean']).view(3, 1, 1).type_as(x)
