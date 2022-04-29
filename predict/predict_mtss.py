@@ -34,21 +34,14 @@ def main():
     crop_val = True
     crop_size = 500
     patch_size = 512
-    output_stride = 16      # choices=[8, 16]
-    num_classes = 7
     img_size = (2448, 2448)
 
-    # setup model
-    model_map = {
-        'mtss_resnet50': models.mtss_resnet50,
-        'mtss_resnet101': models.mtss_resnet101,
-        'mtss_mobilenet': models.mtss_mobilenet,
-        'deeplabv3plus_resnet50': models.deeplabv3plus_resnet50,
-        'deeplabv3plus_resnet101': models.deeplabv3plus_resnet101,
-        'deeplabv3plus_mobilenet': models.deeplabv3plus_mobilenet
-    }
+    model_args = {'encoder': 'resnet50',
+                  'encoder_args': {'output_stride': 16, 'pretrained': True},
+                  'classifier_args': {'n_classes': 7}}
 
-    model = model_map[model_name](num_classes=num_classes, output_stride=output_stride).to(device)
+    model = models.make(model_name, **model_args)
+
     if separable_conv:
         models.convert_to_separable_conv(model.classifier)
 

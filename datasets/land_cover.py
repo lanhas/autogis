@@ -16,8 +16,7 @@ class RoadSegm(data.Dataset):
     def __init__(self, root_path, split='train', **kwargs):
         root_path = Path(root_path)
         self.sat_img_names = list(filter(lambda x: '_sat' in str(x), (root_path / split).iterdir()))
-        self.mask_img_names = list(filter(lambda x: '_mask' in str(x), (root_path / split).iterdir()))
-        assert (len(self.sat_img_names) == len(self.mask_img_names))
+        self.mask_img_names = [Path(str(sat_name).split('_')[0] + '_mask.png') for sat_name in self.sat_img_names]
 
         norm_params = {'mean': [],
                        'std': []}
@@ -44,7 +43,6 @@ class RoadSegm(data.Dataset):
         image = Image.open(self.sat_img_names[index])
         label = Image.open(self.mask_img_names[index])
         label = color2annotation(label)
-        a = np.array(label)
         return self.transform(image, label)
 
     def __len__(self):

@@ -1,7 +1,6 @@
 import os
 import torch
 import numpy as np
-import torch.nn as nn
 from PIL import Image
 from pathlib import Path
 from shutil import copyfile
@@ -10,7 +9,6 @@ from torchvision.transforms.functional import normalize
 from sklearn.model_selection import train_test_split
 from utils.village_segm import mul_transforms as et
 from datasets.village_segm import VillageSegm
-from itertools import combinations
 
 
 def color2annotation(image):
