@@ -11,35 +11,64 @@ from utils.village_segm import mul_transforms as et
 from datasets.village_segm import VillageSegm
 
 
-def color2annotation(image):
+# def color2annotation(image, image_size):
+#     image = np.array(image)
+#     image = (image >= 128).astype(np.uint8)
+#     image = 4 * image[:, :, 0] + 2 * image[:, :, 1] + image[:, :, 2]
+#     cat_image = np.zeros(image_size, dtype=np.uint8)
+#     cat_image[image == 3] = 0  # (Cyan: 011) Urban land
+#     cat_image[image == 6] = 1  # (Yellow: 110) Agriculture land
+#     cat_image[image == 5] = 2  # (Purple: 101) Rangeland
+#     cat_image[image == 2] = 3  # (Green: 010) Forest land
+#     cat_image[image == 1] = 4  # (Blue: 001) Water
+#     cat_image[image == 7] = 5  # (White: 111) Barren land
+#     cat_image[image == 0] = 6  # (Black: 000) Unknown
+#     res = Image.fromarray(cat_image)
+#     return res
+
+
+def color2annotation(image, image_size):
     image = np.array(image)
     image = (image >= 128).astype(np.uint8)
     image = 4 * image[:, :, 0] + 2 * image[:, :, 1] + image[:, :, 2]
-    cat_image = np.zeros((2448, 2448), dtype=np.uint8)
-    cat_image[image == 3] = 0  # (Cyan: 011) Urban land
-    cat_image[image == 6] = 1  # (Yellow: 110) Agriculture land
-    cat_image[image == 5] = 2  # (Purple: 101) Rangeland
-    cat_image[image == 2] = 3  # (Green: 010) Forest land
+    cat_image = np.zeros(image_size, dtype=np.uint8)
+    cat_image[image == 3] = 6  # (Cyan: 011) Village
+    cat_image[image == 6] = 3  # (Yellow: 110) Agriculture land
+    cat_image[image == 5] = 5  # (Purple: 101) Rangeland
+    cat_image[image == 2] = 2  # (Green: 010) Forest land
     cat_image[image == 1] = 4  # (Blue: 001) Water
-    cat_image[image == 7] = 5  # (White: 111) Barren land
-    cat_image[image == 0] = 6  # (Black: 000) Unknown
+    cat_image[image == 7] = 1  # (White: 111) Barren land
+    cat_image[image == 0] = 0  # (Black: 000) Unknown
     res = Image.fromarray(cat_image)
     return res
 
 
-def annotation2color(image):
+# def annotation2color(image, image_size):
+#     image = np.array(image)
+#     color = np.zeros((*image_size, 3), dtype=np.uint8)
+#     color[image == 0] = [0, 255, 255]         # 人造建筑
+#     color[image == 1] = [255, 255, 0]         # 农田
+#     color[image == 2] = [255, 0, 255]         # 牧场
+#     color[image == 3] = [0, 255, 0]           # 森林
+#     color[image == 4] = [0, 0, 255]           # 水系
+#     color[image == 5] = [255, 255, 255]       # 荒地
+#     color[image == 6] = [0, 0, 0]             # 未知区域
+#     res = Image.fromarray(color)
+#     return res
+
+
+def annotation2color(image, image_size):
     image = np.array(image)
-    color = np.zeros((*(2448, 2448), 3), dtype=np.uint8)
-    color[image == 0] = [0, 255, 255]         # 人造建筑
-    color[image == 1] = [255, 255, 0]         # 农田
-    color[image == 2] = [255, 0, 255]         # 牧场
-    color[image == 3] = [0, 255, 0]           # 森林
-    color[image == 4] = [0, 0, 255]           # 水系
-    color[image == 5] = [255, 255, 255]       # 荒地
-    color[image == 6] = [0, 0, 0]             # 未知区域
+    color = np.zeros((*image_size, 3), dtype=np.uint8)
+    color[image == 0] = [0, 0, 0]           # 未知区域
+    color[image == 1] = [128, 0, 0]         # 荒地
+    color[image == 2] = [0, 128, 0]         # 森林
+    color[image == 3] = [128, 128, 0]       # 农田
+    color[image == 4] = [0, 0, 128]         # 水系
+    color[image == 5] = [128, 0, 128]       # 草地
+    color[image == 6] = [0, 128, 128]       # 村落
     res = Image.fromarray(color)
     return res
-
 
 def denormalize(tensor, mean, std):
     """

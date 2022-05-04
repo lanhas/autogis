@@ -50,7 +50,7 @@ class RoadSegm(data.Dataset):
     def __getitem__(self, index):
         image = Image.open(self.sat_img_names[index])
         label = Image.open(self.mask_img_names[index])
-        label = color2annotation(label)
+        label = color2annotation(label, (2448, 2448))
         return self.transform(image, label)
 
     def __len__(self):

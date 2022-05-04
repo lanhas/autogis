@@ -104,6 +104,7 @@ def compute_acc(logits, label, reduction='mean'):
 
 def compute_fast_hist(logits, label, n_classes):
     confusion_matrix = torch.zeros((n_classes, n_classes)).cuda()
+
     label_pred = torch.argmax(logits, dim=1)
     for label_true, label_pred in zip(label, label_pred):
         mask = (label_true >= 0) & (label_true < n_classes)
