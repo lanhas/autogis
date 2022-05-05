@@ -29,6 +29,13 @@ class DeepLabV3(nn.Module):
     def __init__(self, encoder, encoder_args, classifier_args):
         super(DeepLabV3, self).__init__()
 
+        if encoder_args['output_stride'] == 8:
+            aspp_dilate = [12, 24, 36]
+            replace_stride_with_dilation = [False, True, True]
+        else:
+            aspp_dilate = [6, 12, 18]
+            replace_stride_with_dilation = [False, False, True]
+
         if encoder == 'mobilenet':
             inplanes = 320
             low_level_planes = 24
@@ -38,14 +45,10 @@ class DeepLabV3(nn.Module):
             inplanes = 2048
             low_level_planes = 256
             return_layers = {'layer4': 'out', 'layer1': 'low_level'}
+            encoder_args['replace_stride_with_dilation'] = replace_stride_with_dilation
             backbone = models.make(encoder, **encoder_args)
         else:
             raise ValueError('encoder name error! please check!')
-
-        if encoder_args['output_stride'] == 8:
-            aspp_dilate = [12, 24, 36]
-        else:
-            aspp_dilate = [6, 12, 18]
 
         self.encoder = IntermediateLayerGetter(backbone, return_layers=return_layers)
         self.classifier = DeepLabHeadV3Plus(inplanes, low_level_planes,
@@ -54,8 +57,8 @@ class DeepLabV3(nn.Module):
     def forward(self, x):
         # x:遥感数据 y:高程数据
         input_shape = x.shape[-2:]
-        features_rs = self.encoder(x)
-        x = self.classifier(features_rs)
+        features = self.encoder(x)
+        x = self.classifier(features)
         x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
         return x
 

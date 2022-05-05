@@ -18,8 +18,8 @@ class RoadSegm(data.Dataset):
         self.sat_img_names = list(filter(lambda x: '_sat' in str(x), (root_path / split).iterdir()))
         self.mask_img_names = [Path(str(sat_name).split('_')[0] + '_mask.png') for sat_name in self.sat_img_names]
 
-        norm_params = {'mean': [],
-                       'std': []}
+        norm_params = {'mean': [0.485, 0.456, 0.406],
+                       'std': [0.229, 0.224, 0.225]}
         self.n_classes = 7
         crop_size = 512
         normalize = transforms.Normalize(**norm_params)
@@ -29,11 +29,13 @@ class RoadSegm(data.Dataset):
             et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             et.ExtRandomHorizontalFlip(),
             et.ExtToTensor(),
+            normalize,
         ])
 
         val_transform = et.ExtCompose([
             et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             et.ExtToTensor(),
+            norm_params,
         ])
 
         if split == "train":
@@ -50,7 +52,7 @@ class RoadSegm(data.Dataset):
     def __getitem__(self, index):
         image = Image.open(self.sat_img_names[index])
         label = Image.open(self.mask_img_names[index])
-        label = color2annotation(label, (2448, 2448))
+        label = color2annotation(label, image.size)
         return self.transform(image, label)
 
     def __len__(self):

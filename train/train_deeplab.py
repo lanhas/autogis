@@ -37,7 +37,7 @@ def main(config):
                                 **config['val_dataset_args'])
 
     train_loader = DataLoader(train_dataset, config['batch_size'], shuffle=True, pin_memory=True, drop_last=True)
-    val_loader = DataLoader(val_dataset, config['batch_size'], pin_memory=True, drop_last=True)
+    val_loader = DataLoader(val_dataset, config['batch_size'], shuffle=True, pin_memory=True, drop_last=True)
 
     utils.log('train dataset: {} (x{}), {}'.format(
         train_dataset[0][0].shape, len(train_dataset),
@@ -57,6 +57,18 @@ def main(config):
     optimizer, lr_scheduler = utils.make_optimizer(
         model.parameters(),
         config['optimizer'], **config['optimizer_args'])
+
+
+    # temp
+    ls = 7e-3
+    weight_decay = 2e-4
+
+    optimizer = torch.optim.SGD(params=[
+        {'params': model.backbone.parameters(), 'lr': 0.1*lr},
+        {'params': model.classifier.parameters(), 'lr': lr},
+    ], lr=lr, momentum=0.9, weight_decay=weight_decay)
+
+    # temp
 
     # setup others
     max_epoch = config['max_epoch']

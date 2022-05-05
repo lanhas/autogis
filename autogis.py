@@ -1,5 +1,4 @@
-import numpy as np
+from PIL import Image
 
-a = np.arange(4).reshape(2, -1)[np.newaxis, ]
-b = np.random.rand(2, 2)[np.newaxis, ]
-print(np.vstack((a, b)))
+aa = Image.open(r'F:\Dataset\tradition_villages\remote\AH1_001_CF.tif')
+print(aa.size)

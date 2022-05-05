@@ -82,32 +82,7 @@ def main():
                                               axes=(0, 3, 1, 2)) / 255.0).to(device)
             outputs_maps = model(batch_remote_array).max(1)[1].cpu().detach().numpy()
         else:
-            batch_predict_test_maps = np.zeros((len(batch_remote_path_list), img_size[0], img_size[1]))
-            test_remote_miro_array = np.pad(batch_remote_array, pad_width=[(0, 0),
-                                            (miro_margin, miro_margin),
-                                            (miro_margin, miro_margin),
-                                            (0, 0)], mode='reflect')
 
-            for i, start_row in enumerate(stride_idx_height):
-                for j, start_col in enumerate(stride_idx_height):
-                    if start_row + crop_size > img_size[0]:
-                        start_row = img_size[0] - crop_size
-                    if start_col + crop_size > img_size[1]:
-                        start_col = img_size[1] - crop_size
-
-                    batch_patch_test_remote = test_remote_miro_array[:, start_row:start_row + patch_size,
-                                                                     start_col:start_col + patch_size, :]
-
-                    batch_patch_test_remote = torch.Tensor(np.transpose(batch_patch_test_remote,
-                                                                        axes=(0, 3, 1, 2)) / 255.0).to(device)
-                    output_logist = model(batch_patch_test_remote).softmax(dim=1)
-
-                    outputs_maps_patch = output_logist.max(1)[1].cpu().detach().numpy()
-                    outputs_maps_crops = outputs_maps_patch[:, miro_margin:miro_margin+crop_size,
-                                                            miro_margin:miro_margin+crop_size]
-
-                    batch_predict_test_maps[:, start_row:start_row + crop_size,
-                                            start_col:start_col + crop_size] = outputs_maps_crops
             outputs_maps = batch_predict_test_maps
 
         for img_idx, img_path in enumerate(batch_remote_path_list):
