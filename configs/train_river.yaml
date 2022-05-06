@@ -1,0 +1,14 @@
+train_dataset: river-segm
+train_dataset_args: {root_path: F:\Dataset\river, split: train}
+val_dataset: river-segm
+val_dataset_args: {root_path: F:\Dataset\river, split: val}
+
+model: d-unet
+multimodal: False
+
+batch_size: 2
+val_batch_size: 1
+max_epoch: 50
+optimizer: adam
+optimizer_args: {lr: 1.e-3, weight_decay: 5.e-4, milestones:[15, 35]}
+
