@@ -4,7 +4,7 @@ val_dataset: river-segm
 val_dataset_args: {root_path: F:\Dataset\river, split: val}
 
 model: d-unet
-multimodal: False
+multimodal: True
 
 batch_size: 2
 val_batch_size: 1

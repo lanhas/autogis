@@ -42,7 +42,8 @@ class VillageSegm(Dataset):
 
         self.n_classes = 2
         crop_size = 256
-        val_crop_size = 1536
+        # val_crop_size = 1536
+        val_crop_size = 256
         norm_params = {'mean_r': [],
                        'std_r': [],
                        'mean_d': [],

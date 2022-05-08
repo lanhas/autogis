@@ -133,7 +133,9 @@ def train(train_loader, model, optimizer):
             image = torch.cat((image, dem), 1)
 
         outputs = model(image).squeeze(dim=1)
-        loss = F.binary_cross_entropy(outputs, label)
+        # loss = F.binary_cross_entropy(outputs, label)
+        loss = utils.FocalLoss(alpha=1, gamma=2, binary=True)(outputs, label)
+
         acc_mean = utils.bin_dice_coeff(outputs, label)
         iou_mean = utils.bin_jaccard_index(outputs, label)
 
@@ -163,7 +165,7 @@ def validate(val_loader, model):
         with torch.no_grad():
             outputs = model(image).squeeze(dim=1)
 
-            loss = F.binary_cross_entropy(outputs, label)
+            loss = utils.FocalLoss(alpha=1, gamma=2, binary=True)(outputs, label)
             acc_mean = utils.bin_dice_coeff(outputs, label)
             iou_mean = utils.bin_jaccard_index(outputs, label)
 

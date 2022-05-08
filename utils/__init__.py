@@ -225,3 +225,28 @@ def fix_bn(model):
             m.eval()
 
 
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=1, gamma=0, binary=False, size_average=True, ignore_index=255):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.ignore_index = ignore_index
+        self.size_average = size_average
+        self.binary = binary
+
+    def forward(self, inputs, targets):
+        if self.binary:
+            ce_loss = F.binary_cross_entropy(
+                inputs, targets, reduction='none'
+            )
+        else:
+            ce_loss = F.cross_entropy(
+                inputs, targets, reduction='none', ignore_index=self.ignore_index)
+        pt = torch.exp(-ce_loss)
+        focal_loss = self.alpha * (1-pt)**self.gamma * ce_loss
+        if self.size_average:
+            return focal_loss.mean()
+        else:
+            return focal_loss.sum()
+
+

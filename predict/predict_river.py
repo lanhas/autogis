@@ -7,25 +7,31 @@ from pathlib import Path
 
 
 def main():
-    model_name = 'd_unet'
+    model_name = 'd-unet'
     ckpt = Path(r'save/river_segm-d-unet/max-vi.pth')
-    data_path = Path(r'F:\Dataset\tradition_villages_old\Segmentation\JPEGImages')
+    data_path_remote = Path(r'F:\Dataset\tradition_villages_old\Segmentation\JPEGImages')
+    data_path_dem = Path(r'F:\Dataset\tradition_villages_old\Segmentation\DEMImages')
     save_dir = Path(r'F:\Dataset\results\tradition_villages_old')
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    thres = 0.5
+    thres = 0.5         # 预测结果大于该值的像素点将被渲染为255
     batch_size = 1
     crop_size = 500
     patch_size = 512
     img_size = (2448, 2448)
+    stride = crop_size * 1
+    multi_modal = True
 
     # model setup
     if ckpt.is_file():
         print("=> loading checkpoint '{}".format(ckpt))
         checkpoint = torch.load(ckpt)
         model = models.make(model_name)
+        if multi_modal:
+            model.conv1 = torch.nn.Conv2d(4, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
         model.load_state_dict(checkpoint['model_sd'])
+        model = model.to(device)
     else:
         raise ValueError("=> no checkpoint found at '{}'".format(ckpt))
 
@@ -35,17 +41,20 @@ def main():
         save_subdir.mkdir()
 
     model.eval()
-    if data_path.is_dir():
-        file_names_img = list(filter(lambda x: x.suffix == '.jpg', data_path.iterdir()))
-    elif data_path.is_file():
-        file_names_img = [data_path]
+    if data_path_remote.is_dir():
+        file_names_img = list(filter(lambda x: x.suffix == '.jpg', data_path_remote.iterdir()))
+        if multi_modal:
+            file_names_dem = list(filter(lambda x: x.suffix == '.jpg', data_path_dem.iterdir()))
+    elif data_path_remote.is_file():
+        file_names_img = [data_path_remote]
+        if multi_modal:
+            file_names_dem = [data_path_dem]
     else:
         raise ValueError('data path error! please check!')
 
     batch_num = len(file_names_img) // batch_size + 1
 
     # crop_val
-    stride = crop_size * 1
     stride_idx_width = list(range(0, img_size[1], stride))
     stride_idx_height = list(range(0, img_size[0], stride))
     miro_margin = int((patch_size - crop_size) / 2)
@@ -55,6 +64,11 @@ def main():
 
         batch_img_list = [np.array(Image.open(path)) for path in batch_img_path_list]
         batch_img_array = np.array(batch_img_list)
+        if multi_modal:
+            batch_dem_path_list = file_names_dem[batch_idx * batch_size:(batch_idx + 1) * batch_size]
+            batch_dem_list = [np.array(Image.open(path)) for path in batch_dem_path_list]
+            batch_dem_array = np.expand_dims(np.array(batch_dem_list), 3)
+            batch_img_array = np.concatenate((batch_img_array, batch_dem_array), axis=3)
 
         batch_predict_test_maps = np.zeros((len(batch_img_path_list), img_size[0], img_size[1]))
         predict_test_mask = np.zeros(img_size)
@@ -81,8 +95,8 @@ def main():
                 batch_patch_test_img = torch.Tensor(np.transpose(batch_patch_test_img,
                                                                     axes=(0, 3, 1, 2)) / 255.0).to(device)
 
-                output_maps = model(batch_patch_test_img)
-                output_maps = np.squeeze(output_maps.data.cpu().numpy())
+                output_maps = model(batch_patch_test_img.to(device))
+                output_maps = np.squeeze(output_maps.data.cpu().numpy(), axis=1)
 
                 outputs_maps_crops = output_maps[:, miro_margin:miro_margin + crop_size,
                                                  miro_margin:miro_margin + crop_size]
