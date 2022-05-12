@@ -23,6 +23,7 @@ def main():
     stride = crop_size * 1
     multi_modal = True
 
+
     # model setup
     if ckpt.is_file():
         print("=> loading checkpoint '{}".format(ckpt))
