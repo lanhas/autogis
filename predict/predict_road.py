@@ -14,6 +14,7 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+
     thres = 0.5
     batch_size = 1
     crop_size = 500
