@@ -105,22 +105,12 @@ class DeepLabV3_A(nn.Module):
 
         self.encoder = IntermediateLayerGetter(backbone, return_layers=return_layers)
         self.classifier = DeepLabHeadV3Plus(inplanes, low_level_planes,
-                                   classifier_args['n_classes'], aspp_dilate)
-
-        self.cbam_l = CBAM(256)
-        self.cbam_h = CBAM(2048)
+                                   classifier_args['n_classes'], aspp_dilate, attention=True)
 
     def forward(self, x):
         # x:遥感数据 y:高程数据
         input_shape = x.shape[-2:]
         features = self.encoder(x)
-
-        features_low = self.cbam_l(features['low_level'])
-        features_high = self.cbam_h(features['out'])
-        features = {
-            'low_level': features_low,
-            'out': features_high
-        }
         x = self.classifier(features)
         x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
         return x
@@ -160,7 +150,7 @@ class IntermediateLayerGetter(nn.ModuleDict):
 
 
 class DeepLabHeadV3Plus(nn.Module):
-    def __init__(self, in_channels, low_level_channels, num_classes, aspp_dilate=[12, 24, 36]):
+    def __init__(self, in_channels, low_level_channels, num_classes, aspp_dilate=[12, 24, 36], attention=False):
         super(DeepLabHeadV3Plus, self).__init__()
         self.project = nn.Sequential( 
             nn.Conv2d(low_level_channels, 48, 1, bias=False),
@@ -169,7 +159,6 @@ class DeepLabHeadV3Plus(nn.Module):
         )
 
         self.aspp = ASPP(in_channels, aspp_dilate)
-
         self.classifier = nn.Sequential(
             nn.Conv2d(304, 256, 3, padding=1, bias=False),
             nn.BatchNorm2d(256),
@@ -178,9 +167,19 @@ class DeepLabHeadV3Plus(nn.Module):
         )
         self._init_weight()
 
+        self.attention = attention
+        if self.attention:
+            self.cbam_l = CBAM(256)
+            self.cbam_h = CBAM(256)
+
     def forward(self, feature):
-        low_level_feature = self.project( feature['low_level'] )
         output_feature = self.aspp(feature['out'])
+        lowlevel_feature = feature['low_level']
+        if self.attention:
+            lowlevel_feature = self.cbam_l(lowlevel_feature)
+            output_feature = self.cbam_h(output_feature)
+
+        low_level_feature = self.project(lowlevel_feature)
         output_feature = F.interpolate(output_feature, size=low_level_feature.shape[2:], mode='bilinear', align_corners=False)
         # 数据合并处
         return self.classifier( torch.cat( [ low_level_feature, output_feature ], dim=1 ) )
