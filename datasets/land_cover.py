@@ -11,7 +11,7 @@ from utils import ext_transforms as et
 
 
 @register('land-cover')
-class RoadSegm(data.Dataset):
+class LandCoverSegm(data.Dataset):
     """deep globe dataset"""
     def __init__(self, root_path, split='train', **kwargs):
         root_path = Path(root_path)
@@ -22,20 +22,19 @@ class RoadSegm(data.Dataset):
                        'std': [0.229, 0.224, 0.225]}
         self.n_classes = 7
         crop_size = 512
-        normalize = transforms.Normalize(**norm_params)
 
         train_transform = et.ExtCompose([
             et.ExtRandomScale((0.5, 2.0)),
             et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             et.ExtRandomHorizontalFlip(),
             et.ExtToTensor(),
-            normalize,
+            et.ExtNormalize(**norm_params)
         ])
 
         val_transform = et.ExtCompose([
             et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             et.ExtToTensor(),
-            norm_params,
+            et.ExtNormalize(**norm_params)
         ])
 
         if split == "train":

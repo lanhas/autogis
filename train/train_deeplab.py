@@ -64,7 +64,7 @@ def main(config):
     weight_decay = 2e-4
 
     optimizer = torch.optim.SGD(params=[
-        {'params': model.backbone.parameters(), 'lr': 0.1*lr},
+        {'params': model.encoder.parameters(), 'lr': 0.1*lr},
         {'params': model.classifier.parameters(), 'lr': lr},
     ], lr=lr, momentum=0.9, weight_decay=weight_decay)
 

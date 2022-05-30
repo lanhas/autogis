@@ -2,8 +2,6 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from collections import OrderedDict
-from . import resnet
-from . import mobilenetv2
 
 import models.village_segm as models
 from .models import register
@@ -58,6 +56,71 @@ class DeepLabV3(nn.Module):
         # x:遥感数据 y:高程数据
         input_shape = x.shape[-2:]
         features = self.encoder(x)
+
+        x = self.classifier(features)
+        x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
+        return x
+
+
+@register('deeplab-v3p-A')
+class DeepLabV3_A(nn.Module):
+    """
+    Implements DeepLabV3 model from
+    `"Rethinking Atrous Convolution for Semantic Image Segmentation"
+    <https://arxiv.org/abs/1706.05587>`_.
+
+    Arguments:
+        backbone (nn.Module): the models used to compute the features for the model.
+            The backbone should return an OrderedDict[Tensor], with the key being
+            "out" for the last feature map used, and "aux" if an auxiliary classifier
+            is used.
+        classifier (nn.Module): module that takes the "out" element returned from
+            the backbone and returns a dense prediction.
+        aux_classifier (nn.Module, optional): auxiliary classifier used during training
+    """
+
+    def __init__(self, encoder, encoder_args, classifier_args):
+        super(DeepLabV3_A, self).__init__()
+
+        if encoder_args['output_stride'] == 8:
+            aspp_dilate = [12, 24, 36]
+            replace_stride_with_dilation = [False, True, True]
+        else:
+            aspp_dilate = [6, 12, 18]
+            replace_stride_with_dilation = [False, False, True]
+
+        if encoder == 'mobilenet':
+            inplanes = 320
+            low_level_planes = 24
+            return_layers = {'high_level_features': 'out', 'low_level_features': 'low_level'}
+            backbone = models.make(encoder, **encoder_args)
+        elif encoder[:6] == 'resnet':
+            inplanes = 2048
+            low_level_planes = 256
+            return_layers = {'layer4': 'out', 'layer1': 'low_level'}
+            encoder_args['replace_stride_with_dilation'] = replace_stride_with_dilation
+            backbone = models.make(encoder, **encoder_args)
+        else:
+            raise ValueError('encoder name error! please check!')
+
+        self.encoder = IntermediateLayerGetter(backbone, return_layers=return_layers)
+        self.classifier = DeepLabHeadV3Plus(inplanes, low_level_planes,
+                                   classifier_args['n_classes'], aspp_dilate)
+
+        self.cbam_l = CBAM(256)
+        self.cbam_h = CBAM(2048)
+
+    def forward(self, x):
+        # x:遥感数据 y:高程数据
+        input_shape = x.shape[-2:]
+        features = self.encoder(x)
+
+        features_low = self.cbam_l(features['low_level'])
+        features_high = self.cbam_h(features['out'])
+        features = {
+            'low_level': features_low,
+            'out': features_high
+        }
         x = self.classifier(features)
         x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
         return x
@@ -96,117 +159,6 @@ class IntermediateLayerGetter(nn.ModuleDict):
         return out
 
 
-def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_backbone):
-    """
-    基于resnet的语义分割
-
-    Parameters
-    ----------
-    name: str
-        {"deeplabv3plus", "mtss"}optional
-        deeplabv3plus：deeplabv3plus
-        mtss：多模态地形要素语义分割
-    backbone_name: str
-        {"resnet50", "resnet101"}optional
-    numclass: int
-        需要分类的种类数量
-    output_stride: int
-        输出特征图与输入特征图之间的比值
-    pretrained_backbone: bool
-        是否使用预训练模型
-    """
-    if output_stride == 8:
-        replace_stride_with_dilation = [False, True, True]
-        aspp_dilate = [12, 24, 36]
-    else:
-        replace_stride_with_dilation = [False, False, True]
-        aspp_dilate = [6, 12, 18]
-
-    backbone = resnet.__dict__[backbone_name](
-        pretrained=pretrained_backbone,
-        replace_stride_with_dilation=replace_stride_with_dilation)
-
-    inplanes = 2048
-    low_level_planes = 256
-
-    return_layers = {'layer4': 'out', 'layer1': 'low_level'}
-
-    # 单遥感图像
-    classifier_segm = DeepLabHeadV3Plus(inplanes, low_level_planes, num_classes, aspp_dilate)
-    # 修改网络输入为4通道
-    backbone.conv1 = nn.Conv2d(4, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-    backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
-    model = DeepLabV3(backbone, classifier_segm)
-
-    return model
-
-
-def _segm_mobilenet(name, backbone, num_classes, output_stride, pretrained_backbone):
-    """
-    基于mobilenet的语义分割
-
-    Parameters
-    ----------
-    name: str
-        {"deeplabv3plus","mtss"}optional
-        deeplabv3plus：deeplabv3plus
-        mtss：多模态地形要素语义分割
-    numclass: int
-        需要分类的种类数量
-    output_stride: int
-        输出特征图与输入特征图之间的比值
-    pretrained_backbone: bool
-        是否使用预训练模型
-    """
-    if output_stride == 8:
-        aspp_dilate = [12, 24, 36]
-    else:
-        aspp_dilate = [6, 12, 18]
-
-    backbone = mobilenetv2.mobilenet_v2(pretrained=pretrained_backbone, output_stride=output_stride)
-
-    backbone.low_level_features = backbone.features[0:4]
-    backbone.high_level_features = backbone.features[4:-1]
-    backbone.features = None
-    backbone.classifier = None
-    inplanes = 320
-    low_level_planes = 24
-    return_layers = {'high_level_features': 'out', 'low_level_features': 'low_level'}
-    backbone = IntermediateLayerGetter(backbone, return_layers=return_layers)
-
-    # 单遥感图像
-    classifier_segm = DeepLabHeadV3Plus(inplanes, low_level_planes, num_classes, aspp_dilate)
-    model = DeepLabV3(backbone, classifier_segm)
-
-    return model
-
-
-def _load_segmModel(arch_type, backbone, num_classes, output_stride, pretrained_backbone):
-    """
-    地理要素语义分割模型加载
-    Parameters
-    ----------
-    arch_type: str
-        {"deeplabv3plus", "mtss"}optional
-    backbone: str
-        {"resnet50", "resnet101", "mobilenet"}optional
-    num_class: int
-    output_stride: int
-        输入特征图与输出特征图的大小比值
-    pretrained_backbone: bool
-        是否使用ImageNet预训练模型
-    """
-    if backbone == 'mobilenetv2':
-        model = _segm_mobilenet(arch_type, backbone, num_classes, output_stride=output_stride,
-                                pretrained_backbone=pretrained_backbone)
-    elif backbone.startswith('resnet'):
-        model = _segm_resnet(arch_type, backbone, num_classes, output_stride=output_stride,
-                             pretrained_backbone=pretrained_backbone)
-    else:
-        raise NotImplementedError
-    return model
-
-
 class DeepLabHeadV3Plus(nn.Module):
     def __init__(self, in_channels, low_level_channels, num_classes, aspp_dilate=[12, 24, 36]):
         super(DeepLabHeadV3Plus, self).__init__()
@@ -240,6 +192,54 @@ class DeepLabHeadV3Plus(nn.Module):
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
+
+
+class ChannelAttention(nn.Module):
+    def __init__(self, in_planes, ratio=16):
+        super(ChannelAttention, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+
+        self.fc1 = nn.Conv2d(in_planes, in_planes // ratio, 1, bias=False)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Conv2d(in_planes // ratio, in_planes, 1, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = self.fc2(self.relu(self.fc1(self.avg_pool(x))))
+        max_out = self.fc2(self.relu(self.fc1(self.max_pool(x))))
+        out = avg_out + max_out
+        return self.sigmoid(out)
+
+
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(SpatialAttention, self).__init__()
+
+        assert kernel_size in (3, 7)
+        padding = 3 if kernel_size == 7 else 1
+
+        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=padding, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv1(x)
+        return self.sigmoid(x)
+
+
+class CBAM(nn.Module):
+    def __init__(self, c1):
+        super(CBAM, self).__init__()
+        self.channel_attention = ChannelAttention(c1)
+        self.spatial_attential = SpatialAttention()
+
+    def forward(self, x):
+        out = self.channel_attention(x) * x
+        out = self.spatial_attential(out) * out
+        return out
 
 
 class AtrousSeparableConvolution(nn.Module):
@@ -340,38 +340,3 @@ def convert_to_separable_conv(module):
     for name, child in module.named_children():
         new_module.add_module(name, convert_to_separable_conv(child))
     return new_module
-
-
-# Mtss Baseline: Deeplab v3+
-def deeplabv3plus_resnet50(num_classes=7, output_stride=16, pretrained_backbone=True):
-    """Constructs a DeepLabV3 model with a ResNet-50 backbone.
-
-    Args:
-        num_classes (int): number of classes.
-        output_stride (int): output stride for deeplab.
-        pretrained_backbone (bool): If True, use the pretrained backbone.
-    """
-    return _load_segmModel('deeplabv3plus', 'resnet50', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
-
-
-def deeplabv3plus_resnet101(num_classes=7, output_stride=16, pretrained_backbone=True):
-    """Constructs a DeepLabV3+ model with a ResNet-101 backbone.
-
-    Args:
-        num_classes (int): number of classes.
-        output_stride (int): output stride for deeplab.
-        pretrained_backbone (bool): If True, use the pretrained backbone.
-    """
-    return _load_segmModel('deeplabv3plus', 'resnet101', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
-
-
-def deeplabv3plus_mobilenet(num_classes=7, output_stride=16, pretrained_backbone=True):
-    """Constructs a DeepLabV3+ model with a MobileNetv2 backbone.
-
-    Args:
-        num_classes (int): number of classes.
-        output_stride (int): output stride for deeplab.
-        pretrained_backbone (bool): If True, use the pretrained backbone.
-    """
-    return _load_segmModel('deeplabv3plus', 'mobilenetv2', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
-

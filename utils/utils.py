@@ -94,7 +94,6 @@ class Denormalize(object):
         return normalize(tensor, self._mean, self._std)
 
 
-
 def cal_normpara(root_path, image_set):
     """
     计算均值和方差
