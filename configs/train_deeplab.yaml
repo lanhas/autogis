@@ -3,9 +3,9 @@ train_dataset_args: {root_path: F:\Dataset\land cover dataset, split: train}
 val_dataset: land-cover
 val_dataset_args: {root_path: F:\Dataset\land cover dataset, split: val}
 
-model: deeplab-v3p-A
+model: deeplab-v3p
 model_args:
-    encoder: resnet50
+    backbone: xception
     encoder_args: {output_stride: 16, pretrained: True} # choices=[8, 16]
     classifier_args: { n_classes: 7 }
 

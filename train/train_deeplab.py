@@ -18,11 +18,11 @@ from utils import metrics
 def main(config):
     svname = args.name
     if svname is None:
-        svname = 'village_segm-' + config['model'] + '_' + config['model_args']['encoder']
+        svname = 'village_segm-' + config['model'] + '_' + config['model_args']['backbone']
     if args.tag is not None:
         svname += '_' + args.tag
 
-    save_path = Path.cwd() / 'save' / svname
+    save_path = Path.cwd().parent / 'save' / svname
     utils.ensure_path(save_path)
     utils.set_log_path(save_path)
 
@@ -199,7 +199,7 @@ def validate(val_loader, model, n_classes):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='configs/train_deeplab.yaml')
+    parser.add_argument('--config', default='../configs/train_deeplab.yaml')
     parser.add_argument('--name', default=None)
     parser.add_argument('--tag', default=None)
 

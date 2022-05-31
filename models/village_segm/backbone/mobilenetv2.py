@@ -2,7 +2,7 @@
 from torch import nn
 from torchvision.models.utils import load_state_dict_from_url
 import torch.nn.functional as F
-from .models import register
+from models.village_segm.models import register
 
 __all__ = ['MobileNetV2', 'mobilenet_v2']
 
@@ -197,6 +197,7 @@ class MobileNetV2(nn.Module):
         x = x.mean([2, 3])
         x = self.classifier(x)
         return x
+
 
 @register('mobilenet')
 def mobilenet_v2(pretrained=False, progress=True, **kwargs):

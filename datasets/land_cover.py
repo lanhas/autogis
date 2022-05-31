@@ -1,9 +1,7 @@
-import numpy as np
 import torch
 import torch.utils.data as data
 from PIL import Image
 from pathlib import Path
-from torchvision import transforms
 
 from .datasets import register
 from utils.utils import color2annotation
@@ -21,7 +19,7 @@ class LandCoverSegm(data.Dataset):
         norm_params = {'mean': [0.485, 0.456, 0.406],
                        'std': [0.229, 0.224, 0.225]}
         self.n_classes = 7
-        crop_size = 512
+        crop_size = 256
 
         train_transform = et.ExtCompose([
             et.ExtRandomScale((0.5, 2.0)),

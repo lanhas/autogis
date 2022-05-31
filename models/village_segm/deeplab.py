@@ -7,8 +7,7 @@ import models.village_segm as models
 from .models import register
 
 
-@register('deeplab-v3p')
-class DeepLabV3(nn.Module):
+class DeepLabV3Plus(nn.Module):
     """
     Implements DeepLabV3 model from
     `"Rethinking Atrous Convolution for Semantic Image Segmentation"
@@ -24,9 +23,9 @@ class DeepLabV3(nn.Module):
         aux_classifier (nn.Module, optional): auxiliary classifier used during training
     """
 
-    def __init__(self, encoder, encoder_args, classifier_args):
-        super(DeepLabV3, self).__init__()
-
+    def __init__(self, backbone, encoder_args, classifier_args, attention=False):
+        super(DeepLabV3Plus, self).__init__()
+        self.backbone = backbone
         if encoder_args['output_stride'] == 8:
             aspp_dilate = [12, 24, 36]
             replace_stride_with_dilation = [False, True, True]
@@ -34,83 +33,37 @@ class DeepLabV3(nn.Module):
             aspp_dilate = [6, 12, 18]
             replace_stride_with_dilation = [False, False, True]
 
-        if encoder == 'mobilenet':
-            inplanes = 320
-            low_level_planes = 24
-            return_layers = {'high_level_features': 'out', 'low_level_features': 'low_level'}
-            backbone = models.make(encoder, **encoder_args)
-        elif encoder[:6] == 'resnet':
+        if backbone == 'xception':
             inplanes = 2048
-            low_level_planes = 256
-            return_layers = {'layer4': 'out', 'layer1': 'low_level'}
-            encoder_args['replace_stride_with_dilation'] = replace_stride_with_dilation
-            backbone = models.make(encoder, **encoder_args)
+            low_level_planes = 128
+            self.encoder = models.make(backbone, **encoder_args)
         else:
-            raise ValueError('encoder name error! please check!')
+            if backbone == 'mobilenet':
+                inplanes = 320
+                low_level_planes = 24
+                return_layers = {'high_level_features': 'out', 'low_level_features': 'low_level'}
+                backbone = models.make(backbone, **encoder_args)
+            elif backbone[:6] == 'resnet':
+                inplanes = 2048
+                low_level_planes = 256
+                return_layers = {'layer4': 'out', 'layer1': 'low_level'}
+                encoder_args['replace_stride_with_dilation'] = replace_stride_with_dilation
+                backbone = models.make(backbone, **encoder_args)
+            else:
+                raise ValueError('encoder name error! please check!')
 
-        self.encoder = IntermediateLayerGetter(backbone, return_layers=return_layers)
+            self.encoder = IntermediateLayerGetter(backbone, return_layers=return_layers)
         self.classifier = DeepLabHeadV3Plus(inplanes, low_level_planes,
-                                   classifier_args['n_classes'], aspp_dilate)
+                                   classifier_args['n_classes'], aspp_dilate, attention=attention)
 
     def forward(self, x):
-        # x:遥感数据 y:高程数据
         input_shape = x.shape[-2:]
         features = self.encoder(x)
-
-        x = self.classifier(features)
-        x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
-        return x
-
-
-@register('deeplab-v3p-A')
-class DeepLabV3_A(nn.Module):
-    """
-    Implements DeepLabV3 model from
-    `"Rethinking Atrous Convolution for Semantic Image Segmentation"
-    <https://arxiv.org/abs/1706.05587>`_.
-
-    Arguments:
-        backbone (nn.Module): the models used to compute the features for the model.
-            The backbone should return an OrderedDict[Tensor], with the key being
-            "out" for the last feature map used, and "aux" if an auxiliary classifier
-            is used.
-        classifier (nn.Module): module that takes the "out" element returned from
-            the backbone and returns a dense prediction.
-        aux_classifier (nn.Module, optional): auxiliary classifier used during training
-    """
-
-    def __init__(self, encoder, encoder_args, classifier_args):
-        super(DeepLabV3_A, self).__init__()
-
-        if encoder_args['output_stride'] == 8:
-            aspp_dilate = [12, 24, 36]
-            replace_stride_with_dilation = [False, True, True]
-        else:
-            aspp_dilate = [6, 12, 18]
-            replace_stride_with_dilation = [False, False, True]
-
-        if encoder == 'mobilenet':
-            inplanes = 320
-            low_level_planes = 24
-            return_layers = {'high_level_features': 'out', 'low_level_features': 'low_level'}
-            backbone = models.make(encoder, **encoder_args)
-        elif encoder[:6] == 'resnet':
-            inplanes = 2048
-            low_level_planes = 256
-            return_layers = {'layer4': 'out', 'layer1': 'low_level'}
-            encoder_args['replace_stride_with_dilation'] = replace_stride_with_dilation
-            backbone = models.make(encoder, **encoder_args)
-        else:
-            raise ValueError('encoder name error! please check!')
-
-        self.encoder = IntermediateLayerGetter(backbone, return_layers=return_layers)
-        self.classifier = DeepLabHeadV3Plus(inplanes, low_level_planes,
-                                   classifier_args['n_classes'], aspp_dilate, attention=True)
-
-    def forward(self, x):
-        # x:遥感数据 y:高程数据
-        input_shape = x.shape[-2:]
-        features = self.encoder(x)
+        if self.backbone == 'xception':
+            feature = OrderedDict()
+            feature['low_level'] = features[1]
+            feature['out'] = features[0]
+            features = feature
         x = self.classifier(features)
         x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
         return x
@@ -169,7 +122,7 @@ class DeepLabHeadV3Plus(nn.Module):
 
         self.attention = attention
         if self.attention:
-            self.cbam_l = CBAM(256)
+            self.cbam_l = CBAM(low_level_channels)
             self.cbam_h = CBAM(256)
 
     def forward(self, feature):
@@ -339,3 +292,13 @@ def convert_to_separable_conv(module):
     for name, child in module.named_children():
         new_module.add_module(name, convert_to_separable_conv(child))
     return new_module
+
+
+@register('deeplab-v3p')
+def deeplabv3p(backbone, encoder_args, classifier_args):
+    return DeepLabV3Plus(backbone, encoder_args, classifier_args)
+
+
+@register('deeplab-v3p-a')
+def deeplabv3p_a(backbone, encoder_args, classifier_args):
+    return DeepLabV3Plus(backbone, encoder_args, classifier_args, attention=True)
