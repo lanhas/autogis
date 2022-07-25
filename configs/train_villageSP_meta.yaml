@@ -1,0 +1,21 @@
+train_dataset: villageSP-clss
+train_dataset_args: {root_path: F:\Dataset\traditional villages\villageSP_QDN, split: train, augment: flip}
+val_dataset: villageSP-clss
+val_dataset_args: {root_path: F:\Dataset\traditional villages\villageSP_QDN, split: val}
+
+model: meta-baseline
+model_args:
+    encoder: resnet12-a
+    encoder_args: {input_channels: 4}
+load_encoder: ../save/villageSP_clss-resnet12-a-0725/max-va.pth
+
+n_way: 3
+n_shot: 1
+n_query: 5
+train_batches: 200
+ep_per_batch: 2
+
+max_epoch: 20
+optimizer: sgd
+optimizer_args: {lr: 1.e-3, weight_decay: 5.e-4, milestone: [15]}
+num_workers: 0

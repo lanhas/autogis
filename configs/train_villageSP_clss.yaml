@@ -1,0 +1,27 @@
+train_dataset: villageSP-clss
+train_dataset_args: {root_path: F:\Dataset\traditional villages\villageSP_QDN, split: train, augment: flip}
+val_dataset: villageSP-clss
+val_dataset_args: {root_path: F:\Dataset\traditional villages\villageSP_QDN, split: val}
+fs_dataset: villageSP-clss
+fs_dataset_args: {root_path: F:\Dataset\traditional villages\villageSP_QDN, split: val}
+eval_fs_args:
+    n_way: 3
+    n_query: 5
+    n_shot: 1
+    ep_per_batch: 2
+    train_batches: 20
+
+model: classifier
+model_args:
+    encoder: resnet12-a
+    encoder_args: {input_channels: 4}
+    classifier: linear-classifier
+    classifier_args: { n_classes: 3 }
+
+batch_size: 16
+eval_fs_epoch: 5
+max_epoch: 100
+optimizer: sgd
+optimizer_args: {lr: 0.1, weight_decay: 5.e-4, milestone:[40, 80]}
+
+num_workers: 0
