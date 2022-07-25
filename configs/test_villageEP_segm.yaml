@@ -1,0 +1,13 @@
+val_dataset: village-segm
+val_dataset_args: {root_path: /home/nscn/datasets/tradition_villages_old/Segmentation, split: val}
+
+model: mtss-a
+model_args:
+    encoder: resnet50
+    encoder_args: {output_stride: 16, pretrained: True} # choices=[8, 16]
+    classifier_args: { n_classes: 7 }
+
+load: /home/nscn/user/xp/models/model.pth
+#load: ./save/village_segm-mtss_resnet50_0525/epoch-last.pth
+separable_conv: False
+batch_size: 8

@@ -14,12 +14,18 @@ class Classifier(nn.Module):
     def __init__(self, encoder, encoder_args,
                  classifier, classifier_args):
         super().__init__()
+        # self.encoder = models.make(encoder, **encoder_args)
+        # self.encoder = nn.Sequential(
+        #     self.features,
+        #     nn.functional.ada
+        # )
         self.encoder = models.make(encoder, **encoder_args)
         classifier_args['in_dim'] = self.encoder.out_dim
         self.classifier = models.make(classifier, **classifier_args)
 
-    def forward(self, x):
-        x = self.encoder(x)
+    def forward(self, inputs):
+        x = self.encoder(inputs)
+        x = x.view(x.shape[0], x.shape[1], -1).mean(dim=2)
         x = self.classifier(x)
         return x
 

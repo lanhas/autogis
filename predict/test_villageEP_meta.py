@@ -110,7 +110,7 @@ def main(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='./configs/test_few_shot.yaml')
+    parser.add_argument('--config', default='./configs/test_villageSP_meta.yaml')
     parser.add_argument('--shot', type=int, default=1)
     parser.add_argument('--test-epochs', type=int, default=10)
     parser.add_argument('--sauc', action='store_true')

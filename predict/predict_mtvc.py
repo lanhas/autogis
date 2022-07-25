@@ -4,7 +4,7 @@ import numpy as np
 import models.village_clss as models
 
 from torch.utils import data
-from datasets.village_clss import VillageClss
+from datasets.villageEP import VillageClss
 import torchvision.transforms as T
 import matplotlib.pyplot as plt
 

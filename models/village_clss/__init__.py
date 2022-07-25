@@ -1,4 +1,4 @@
-from . import resnet12
+from . import resneta
 from . import classifier
 from . import meta_baseline
 from . import siamese

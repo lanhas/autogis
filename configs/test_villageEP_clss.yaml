@@ -1,0 +1,8 @@
+dataset: villageEP-clss
+dataset_args: {root_path: F:\Dataset\traditional villages\villageEP_GZ\Classification, split: val}
+
+cam: True
+cam_args:
+    img_path: F:\Dataset\traditional villages\villageEP_GZ\Classification\JPEGImages
+
+load: ../save/villageEP_clss-resnet12-a-0725/max-va.pth

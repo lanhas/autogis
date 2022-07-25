@@ -21,7 +21,7 @@ def main(config):
     if args.tag is not None:
         svname += '_' + args.tag
 
-    save_path = Path.cwd() / 'save' / svname
+    save_path = Path.cwd().parent / 'save' / svname
     utils.ensure_path(save_path)
     utils.set_log_path(save_path)
 
@@ -80,18 +80,18 @@ def main(config):
         t_estimate = utils.time_str(timer_used.t() / epoch * max_epoch)
 
         log_str = 'train loss: {:.4f} | train acc: {:.4f} | train iou:{:.4f}\n'.format(
-            train_score['tl'].get_avg(), train_score['ta'].get_avg(), train_score['tim'].get_avg())
+            train_score['tl'].avg, train_score['ta'].avg, train_score['tim'].avg)
         log_str += 'val loss: {:.4f} | val acc: {:.4f} | val iou:{:.4f}\n'.format(
-            val_score['vl'].get_avg(), val_score['va'].get_avg(), val_score['vim'].get_avg())
+            val_score['vl'].avg, val_score['va'].avg, val_score['vim'].avg)
 
-        writer.add_scalars('loss', {'train': train_score['tl'].get_avg()}, epoch)
-        writer.add_scalars('loss', {'val': val_score['vl'].get_avg()}, epoch)
+        writer.add_scalars('loss', {'train': train_score['tl'].avg}, epoch)
+        writer.add_scalars('loss', {'val': val_score['vl'].avg}, epoch)
 
-        writer.add_scalars('acc', {'train': train_score['tl'].get_avg()}, epoch)
-        writer.add_scalars('acc', {'val': val_score['va'].get_avg()}, epoch)
+        writer.add_scalars('acc', {'train': train_score['tl'].avg}, epoch)
+        writer.add_scalars('acc', {'val': val_score['va'].avg}, epoch)
 
-        writer.add_scalars('mean_IoU', {'train': train_score['tim'].get_avg()}, epoch)
-        writer.add_scalars('mean_IoU', {'val': val_score['vim'].get_avg()}, epoch)
+        writer.add_scalars('mean_IoU', {'train': train_score['tim'].avg}, epoch)
+        writer.add_scalars('mean_IoU', {'val': val_score['vim'].avg}, epoch)
 
         log_str += 't_epoch:{} | t_used:{}/{}'.format(t_epoch, t_used, t_estimate)
         utils.log(log_str)
@@ -114,8 +114,8 @@ def main(config):
         }
 
         torch.save(save_obj, save_path / 'epoch-last.pth')
-        if val_score['vim'].get_avg() > max_vi:
-            max_vi = val_score['vim'].get_avg()
+        if val_score['vim'].avg > max_vi:
+            max_vi = val_score['vim'].avg
             torch.save(save_obj, save_path / 'max-vi.pth')
         writer.flush()
 
@@ -138,9 +138,9 @@ def train(train_loader, model, optimizer):
         loss.backward()
         optimizer.step()
 
-        aves['tl'].add(loss.item())
-        aves['ta'].add(acc_mean)
-        aves['tim'].add(iou_mean)
+        aves['tl'].update(loss.item())
+        aves['ta'].update(acc_mean)
+        aves['tim'].update(iou_mean)
 
     return aves
 
@@ -160,16 +160,16 @@ def validate(val_loader, model):
             acc_mean = utils.bin_dice_coeff(outputs, label)
             iou_mean = utils.bin_jaccard_index(outputs, label)
 
-        aves['vl'].add(loss.item())
-        aves['va'].add(acc_mean)
-        aves['vim'].add(iou_mean)
+        aves['vl'].update(loss.item())
+        aves['va'].update(acc_mean)
+        aves['vim'].update(iou_mean)
 
     return aves
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='configs/train_road.yaml')
+    parser.add_argument('--config', default='../configs/train_road.yaml')
     parser.add_argument('--name', default=None)
     parser.add_argument('--tag', default=None)
 

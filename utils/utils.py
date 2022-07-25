@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from torchvision.transforms.functional import normalize
 from sklearn.model_selection import train_test_split
 from utils.village_segm import mul_transforms as et
-from datasets.village_segm import VillageSegm
+# from datasets.village_segm import VillageSegm
 
 
 # def color2annotation(image, image_size):

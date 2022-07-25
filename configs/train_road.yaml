@@ -8,5 +8,5 @@ model: d-unet
 batch_size: 2
 max_epoch: 75
 optimizer: adam
-optimizer_args: {lr: 1.e-3, weight_decay: 5.e-4, milestones:[50]}
+optimizer_args: {lr: 1.e-3, weight_decay: 5.e-4, milestone: [50]}
 

@@ -1,17 +1,20 @@
 train_dataset: land-cover
-train_dataset_args: {root_path: F:\Dataset\land cover dataset, split: train}
+train_dataset_args: {root_path: /home/nscn/datasets/land cover dataset, split: train}
 val_dataset: land-cover
-val_dataset_args: {root_path: F:\Dataset\land cover dataset, split: val}
+val_dataset_args: {root_path: /home/nscn/datasets/land cover dataset, split: val}
 
-model: deeplab-v3p
+model: deeplab-v3p-a
 model_args:
     backbone: xception
     encoder_args: {output_stride: 16, pretrained: True} # choices=[8, 16]
     classifier_args: { n_classes: 7 }
 
-batch_size: 2
+batch_size: 4
+val_batch_size: 1
 max_epoch: 75
-optimizer: adam
-optimizer_args: {lr: 1.e-3, weight_decay: 5.e-4, milestones:[50]}
+#optimizer: adam
+#optimizer_args: {lr: 2.e-3, weight_decay: 5.e-4, milestone:[40, 60]}
+optimizer: sgd
+optimizer_args: {lr: 1.e-2, weight_decay: 2.e-4, milestone:[40, 60]}
 
 separable_conv: False

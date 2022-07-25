@@ -21,23 +21,14 @@ class RoadSegm(data.Dataset):
                        'std': []}
         crop_size = 256
         normalize = transforms.Normalize(**norm_params)
-
-        train_transform = et.ExtCompose([
-            et.ExtRandomScale((0.5, 2.0)),
+        self.default_transform = et.ExtCompose([
             et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             et.ExtRandomHorizontalFlip(),
             et.ExtToTensor(),
         ])
-
-        val_transform = et.ExtCompose([
-            et.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
-            et.ExtToTensor(),
-        ])
-
-        if split == "train":
-            self.transform = train_transform
-        else:
-            self.transform = val_transform
+        augment = kwargs.get('augment')
+        if augment is None:
+            self.transform = self.default_transform
 
         def convert_raw(x):
             mean = torch.tensor(norm_params['mean']).view(3, 1, 1).type_as(x)

@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from PIL import Image
 from pathlib import Path
-from datasets.village_segm import VillageSegm
+from datasets.villageEP import VillageSegm
 
 # -----------------------------------------------------------------#
 #                     mask color                                   #

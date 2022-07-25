@@ -183,7 +183,7 @@ def compute_n_params(model, return_str=True):
         return tot
 
 
-def make_optimizer(params, name, lr, weight_decay=None, milestones=None):
+def make_optimizer(params, name, lr, weight_decay=None, milestone=None):
     if weight_decay is None:
         weight_decay = 0.
     if name == 'sgd':
@@ -192,8 +192,8 @@ def make_optimizer(params, name, lr, weight_decay=None, milestones=None):
         optimizer = Adam(params, lr, weight_decay=weight_decay)
     else:
         raise ValueError('optimizer name error! please check')
-    if milestones:
-        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones)
+    if milestone:
+        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestone)
     else:
         lr_scheduler = None
     return optimizer, lr_scheduler

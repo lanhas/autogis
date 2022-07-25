@@ -1,0 +1,4 @@
+dataset: villageSP-clss
+dataset_args: {root_path: F:\Dataset\traditional villages\villageEP_GZ\Classification\JPEGImages, split: val}
+
+load: ../save/classifier_village-clss_resnet12/epoch-last.pth

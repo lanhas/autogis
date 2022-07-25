@@ -1,0 +1,18 @@
+train_dataset: villageEP-segm
+train_dataset_args: {root_path: F:\Dataset\traditional villages\villageEP_GZ\Segmentation, split: train}
+val_dataset: villageEP-segm
+val_dataset_args: {root_path: F:\Dataset\traditional villages\villageEP_GZ\Segmentation, split: val}
+
+model: mtss
+model_args:
+    encoder: resnet50
+    encoder_args: {output_stride: 16, pretrained: True} # choices=[8, 16]
+    classifier_args: { n_classes: 7 }
+
+batch_size: 8
+val_batch_size: 1
+max_epoch: 75
+optimizer: adam
+optimizer_args: {lr: 1.e-3, weight_decay: 5.e-4, milestone: [35, 60]}
+
+separable_conv: False

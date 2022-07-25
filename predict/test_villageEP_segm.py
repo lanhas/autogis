@@ -72,7 +72,7 @@ def validate(val_loader, model, model_name, n_classes):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='configs/test_mtss.yaml')
+    parser.add_argument('--config', default='configs/test_villageEP_segm.yaml')
 
     args = parser.parse_args()
 

@@ -1,9 +1,10 @@
 # from PIL import Image
 #
-# aa = Image.open(r'F:\Dataset\tradition_villages\remote\AH1_001_CF.tif')
-# print(aa.size)
-import numpy as np
+# aa = Image.open(r'F:\Dataset\traditional villages_QDN\contourLine_g\GZ1_024_ZC_demi.png')
+# aa = aa.convert('L')
+# aa.save('test.png')
+# aa.show()
+import models.village_clss as models
 
-a = np.arange(12).reshape((1, 3, 4))
-b = np.arange(6).reshape((1, 3, 2))
-print(np.concatenate((a, b), axis=2))
+model = models.resneta.resnet50()
+print(model)
