@@ -73,6 +73,7 @@ class VillageSegm(Dataset):
         ])
         self.val_transform = mt.ExtCompose([
             # mt.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
+            mt.ExtRandomCrop(size=(crop_size, crop_size), pad_if_needed=True),
             mt.ExtToTensor(),
         ])
         augment = kwargs.get('augment')

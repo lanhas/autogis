@@ -1,8 +1,0 @@
-dataset: villageSP-clss
-dataset_args: {root_path: F:\Dataset\traditional villages\villageSP_QDN, split: val}
-
-cam: True
-cam_args:
-    img_path: F:\Dataset\traditional villages\villageSP_QDN\remote
-
-load: ../save/villageEP_clss-resnet12-a-0725/max-va.pth

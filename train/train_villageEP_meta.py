@@ -21,7 +21,7 @@ def main(config):
     svname = args.name
     if svname is None:
         svname = 'villageEP_meta-{}-{}shot'.format(
-                   config['model'], config['train_fs_args']['n_shot']) \
+                   config['model'], config['n_shot']) \
                    + '-' + config['model_args']['encoder']
     if args.tag is not None:
         svname += '_' + args.tag
@@ -204,8 +204,7 @@ def train(train_loader, model, optimizer, n_way, n_shot, n_query, ep_per_batch):
 
     model.train()
     # iterate over data
-    for data_r, data_d, _ in tqdm(train_loader):
-        data = torch.cat((data_r, data_d.unsqueeze(1)), dim=1)
+    for data, _ in tqdm(train_loader):
         x_shot, x_query = fs.split_shot_query(data.cuda(),
                                               n_way, n_shot,
                                               n_query,
@@ -233,8 +232,7 @@ def validate(valid_loader, model, n_way, n_shot, n_query, ep_per_batch):
 
     model.eval()
     # Iterate over Data
-    for data_r, data_d, _ in tqdm(valid_loader):
-        data = torch.cat((data_r, data_d.unsqueeze(1)), dim=1)
+    for data, _ in tqdm(valid_loader):
         x_shot, x_query = fs.split_shot_query(data.cuda(),
                                               n_way, n_shot, n_query,
                                               ep_per_batch=ep_per_batch)

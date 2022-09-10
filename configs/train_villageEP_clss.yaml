@@ -6,8 +6,8 @@ fs_dataset: villageEP-clss
 fs_dataset_args: {root_path: F:\Dataset\traditional villages\villageEP_GZ\Classification, split: val}
 eval_fs_args:
     n_way: 3
-    n_query: 5
     n_shot: 1
+    n_query: 5
     ep_per_batch: 2
     train_batches: 20
 

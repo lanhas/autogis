@@ -228,8 +228,8 @@ def imageSets_mtsd():
 
 
 def imageSets_mtvcd():
-    total_path = 'datasets/tarin/mtvcd/total.txt'
-    saveBasePath = Path.cwd() / 'datasets/tarin/mtvcd'
+    total_path = r'F:\Dataset\traditional villages\villageSP_QDN\ImageSets\spatial_patterns.csv'
+    saveBasePath = Path(r'F:\Dataset\traditional villages\villageSP_QDN\ImageSets')
 
     trainval_percent=1.0      # 训练验证集/测试集比例
     train_percent=0.85      # 训练集/验证集比例
@@ -250,4 +250,4 @@ def imageSets_mtvcd():
 
 
 if __name__ == "__main__":
-    update_testSet('mtvcd')
+    imageSets_mtvcd()

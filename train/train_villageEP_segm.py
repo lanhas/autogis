@@ -65,6 +65,8 @@ def main(config):
 
     if milestone:
         lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestone)
+    else:
+        lr_scheduler = None
     # temp code
     # setup others
     max_epoch = config['max_epoch']
@@ -201,7 +203,7 @@ def validate(val_loader, model, model_name, n_classes):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='../configs/train_mtss.yaml')
+    parser.add_argument('--config', default='../configs/train_villageEP_segm.yaml')
     parser.add_argument('--name', default=None)
     parser.add_argument('--tag', default=None)
 

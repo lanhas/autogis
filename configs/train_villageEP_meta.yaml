@@ -5,14 +5,14 @@ val_dataset_args: {root_path: F:\Dataset\traditional villages\villageEP_GZ\Class
 
 model: meta-baseline
 model_args:
-    encoder: resnet12-1a
-    encoder_args: {}
-load_encoder: ../save/village_clss-classifier_resnet12/max-va.pth
+    encoder: resnet12-a
+    encoder_args: {input_channels: 1}
+load_encoder: ../save/villageEP_clss-resnet12-a-0725/max-va.pth
 
 n_way: 3
 n_shot: 1
-n_query: 5
-train_batches: 200
+n_query: 3
+train_batches: 20
 ep_per_batch: 2
 
 max_epoch: 20

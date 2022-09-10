@@ -1,7 +1,7 @@
 train_dataset: road-segm
-train_dataset_args: {root_path: F:\Dataset\road dataset, split: train}
+train_dataset_args: {root_path: F:\Dataset\road dataset\deepglobal road, split: train}
 val_dataset: road-segm
-val_dataset_args: {root_path: F:\Dataset\road dataset, split: val}
+val_dataset_args: {root_path: F:\Dataset\road dataset\deepglobal road, split: val}
 
 model: d-unet
 

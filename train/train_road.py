@@ -138,9 +138,9 @@ def train(train_loader, model, optimizer):
         loss.backward()
         optimizer.step()
 
-        aves['tl'].update(loss.item())
-        aves['ta'].update(acc_mean)
-        aves['tim'].update(iou_mean)
+        aves['tl'].add(loss.item())
+        aves['ta'].add(acc_mean)
+        aves['tim'].add(iou_mean)
 
     return aves
 
@@ -160,9 +160,9 @@ def validate(val_loader, model):
             acc_mean = utils.bin_dice_coeff(outputs, label)
             iou_mean = utils.bin_jaccard_index(outputs, label)
 
-        aves['vl'].update(loss.item())
-        aves['va'].update(acc_mean)
-        aves['vim'].update(iou_mean)
+        aves['vl'].add(loss.item())
+        aves['va'].add(acc_mean)
+        aves['vim'].add(iou_mean)
 
     return aves
 
