@@ -22,23 +22,17 @@ cd autogis
 
 ## Data
 
----
-
 Prepare datasets of interest as described in [dataset.md](./dataset.md).
 
 ## Training
 
----
 Read the [training tutorial](./train.md) for details.
 
 ## Usage
 
----
 Read the [usage tutorial](./usage.md) for details.
 
 Acknowledgement for reference repos
-
----
 
 + [Deepglobal](https://github.com/chrischoy/DeepGlobalRegistration)
 + [DeepLab V3+](https://github.com/jfzhang95/pytorch-deeplab-xception)
