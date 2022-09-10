@@ -1,0 +1,9 @@
+pytorch==1.7.0
+matplotlib
+addict
+scipy
+tensorboard
+scikit-learn
+python-lmdb
+pillow
+tensorboard
