@@ -1,0 +1,682 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1194</width>
+    <height>803</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
+     <widget class="QLabel" name="label">
+      <property name="minimumSize">
+       <size>
+        <width>960</width>
+        <height>640</height>
+       </size>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="tabletTracking">
+       <bool>false</bool>
+      </property>
+      <property name="autoFillBackground">
+       <bool>true</bool>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="pixmap">
+       <pixmap resource="skeleton.qrc">:/pic/resource/background.jpg</pixmap>
+      </property>
+      <property name="scaledContents">
+       <bool>true</bool>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QWidget" name="widget" native="true">
+      <property name="minimumSize">
+       <size>
+        <width>190</width>
+        <height>0</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>190</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <widget class="QPushButton" name="pushButton_offsetCalc">
+       <property name="geometry">
+        <rect>
+         <x>20</x>
+         <y>570</y>
+         <width>131</width>
+         <height>41</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>偏移测算</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="pushButton_extrateVillage">
+       <property name="geometry">
+        <rect>
+         <x>20</x>
+         <y>220</y>
+         <width>131</width>
+         <height>41</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>村落提取</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="pushButton_medax">
+       <property name="geometry">
+        <rect>
+         <x>20</x>
+         <y>290</y>
+         <width>131</width>
+         <height>41</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>中轴法骨架发掘</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="pushButton_ori">
+       <property name="geometry">
+        <rect>
+         <x>20</x>
+         <y>80</y>
+         <width>131</width>
+         <height>41</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>原图</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="pushButton_drawOutline">
+       <property name="geometry">
+        <rect>
+         <x>20</x>
+         <y>150</y>
+         <width>131</width>
+         <height>41</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>边界标注</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="pushButton_drawRoad">
+       <property name="geometry">
+        <rect>
+         <x>20</x>
+         <y>500</y>
+         <width>131</width>
+         <height>41</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>道路标注</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="pushButton_sk2">
+       <property name="geometry">
+        <rect>
+         <x>20</x>
+         <y>430</y>
+         <width>131</width>
+         <height>41</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>细化法骨架发掘2</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="pushButton_sk1">
+       <property name="geometry">
+        <rect>
+         <x>20</x>
+         <y>360</y>
+         <width>131</width>
+         <height>41</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>细化法骨架发掘1</string>
+       </property>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1194</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu">
+    <property name="title">
+     <string>文件(F)</string>
+    </property>
+    <addaction name="action_openfile"/>
+    <addaction name="action_openOutline"/>
+    <addaction name="action_addDem"/>
+    <addaction name="separator"/>
+    <addaction name="action_saveImg"/>
+    <addaction name="separator"/>
+    <addaction name="action_quit"/>
+   </widget>
+   <widget class="QMenu" name="menu_2">
+    <property name="title">
+     <string>编辑(E)</string>
+    </property>
+    <addaction name="action_cleanImg"/>
+    <addaction name="action_cleanOutline"/>
+    <addaction name="action_parameters"/>
+   </widget>
+   <widget class="QMenu" name="menu_3">
+    <property name="title">
+     <string>视图(V)</string>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menu_4">
+    <property name="title">
+     <string>帮助(H)</string>
+    </property>
+    <addaction name="actioncallme"/>
+   </widget>
+   <widget class="QMenu" name="menu_I">
+    <property name="title">
+     <string>图像(I)</string>
+    </property>
+    <widget class="QMenu" name="menu_5">
+     <property name="title">
+      <string>地形分析</string>
+     </property>
+     <addaction name="action_slope"/>
+     <addaction name="action_curvature"/>
+     <addaction name="action_slopeDivide"/>
+    </widget>
+    <addaction name="menu_5"/>
+    <addaction name="action_extractColor"/>
+   </widget>
+   <widget class="QMenu" name="menu_W">
+    <property name="title">
+     <string>窗口(W)</string>
+    </property>
+   </widget>
+   <addaction name="menu"/>
+   <addaction name="menu_2"/>
+   <addaction name="menu_I"/>
+   <addaction name="menu_3"/>
+   <addaction name="menu_W"/>
+   <addaction name="menu_4"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="action_openfile">
+   <property name="text">
+    <string>打开(O)</string>
+   </property>
+  </action>
+  <action name="action_openmask">
+   <property name="text">
+    <string>打开掩码</string>
+   </property>
+  </action>
+  <action name="action_cleanOutline">
+   <property name="text">
+    <string>清空图层</string>
+   </property>
+  </action>
+  <action name="action_openOutline">
+   <property name="text">
+    <string>添加轮廓线</string>
+   </property>
+  </action>
+  <action name="action_saveImg">
+   <property name="text">
+    <string>另存为(A)...</string>
+   </property>
+  </action>
+  <action name="action_quit">
+   <property name="text">
+    <string>退出(Q)</string>
+   </property>
+  </action>
+  <action name="action_cleanImg">
+   <property name="text">
+    <string>清空标注</string>
+   </property>
+   <property name="iconText">
+    <string>清空标注</string>
+   </property>
+   <property name="toolTip">
+    <string>清空标注</string>
+   </property>
+  </action>
+  <action name="action_extractColor">
+   <property name="text">
+    <string>取色</string>
+   </property>
+  </action>
+  <action name="action_addDem">
+   <property name="text">
+    <string>添加高程数据</string>
+   </property>
+  </action>
+  <action name="action_slope">
+   <property name="text">
+    <string>坡度计算</string>
+   </property>
+  </action>
+  <action name="action_curvature">
+   <property name="text">
+    <string>曲率计算</string>
+   </property>
+  </action>
+  <action name="action_parameters">
+   <property name="text">
+    <string>参数设置</string>
+   </property>
+  </action>
+  <action name="action_slopeDivide">
+   <property name="text">
+    <string>坡度阈值划分</string>
+   </property>
+  </action>
+  <action name="actioncallme">
+   <property name="text">
+    <string>联系我们</string>
+   </property>
+  </action>
+ </widget>
+ <resources>
+  <include location="skeleton.qrc"/>
+ </resources>
+ <connections>
+  <connection>
+   <sender>pushButton_ori</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>show_oriImg()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1140</x>
+     <y>152</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1052</x>
+     <y>34</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_medax</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>medaxis()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1130</x>
+     <y>362</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>980</x>
+     <y>401</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_sk1</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>skletonize1()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1135</x>
+     <y>432</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1041</x>
+     <y>501</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_sk2</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>skletonize2()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1125</x>
+     <y>502</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>977</x>
+     <y>621</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_drawOutline</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>draw_outline()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1145</x>
+     <y>222</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>977</x>
+     <y>243</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_extrateVillage</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>extract_village()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1145</x>
+     <y>292</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>977</x>
+     <y>355</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_openfile</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>open_file()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>644</x>
+     <y>464</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_cleanOutline</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>cleanLine()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>644</x>
+     <y>464</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_drawRoad</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>drow_road()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1118</x>
+     <y>572</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>888</x>
+     <y>786</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_offsetCalc</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>offset_calculate()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1145</x>
+     <y>642</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1127</x>
+     <y>779</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_openOutline</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>openOutline()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>597</x>
+     <y>399</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_cleanImg</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>cleanImg()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>596</x>
+     <y>401</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_extractColor</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>extractColor()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>596</x>
+     <y>401</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_quit</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>quit()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>596</x>
+     <y>401</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_saveImg</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>saveImg()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>596</x>
+     <y>401</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_parameters</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>paraSetting()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>596</x>
+     <y>401</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_addDem</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>add_elevationData()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>596</x>
+     <y>401</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_curvature</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>calCurvature()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>596</x>
+     <y>401</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_slopeDivide</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>slopeDivide()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>596</x>
+     <y>401</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>action_slope</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>calSlope()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>596</x>
+     <y>401</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>actioncallme</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>callme()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>596</x>
+     <y>401</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>show_oriImg()</slot>
+  <slot>medaxis()</slot>
+  <slot>skletonize1()</slot>
+  <slot>skletonize2()</slot>
+  <slot>open_file()</slot>
+  <slot>draw_outline()</slot>
+  <slot>extract_village()</slot>
+  <slot>comboboxChange()</slot>
+  <slot>cleanLine()</slot>
+  <slot>drow_road()</slot>
+  <slot>offset_calculate()</slot>
+  <slot>openOutline()</slot>
+  <slot>extractColor()</slot>
+  <slot>cleanImg()</slot>
+  <slot>quit()</slot>
+  <slot>saveImg()</slot>
+  <slot>update_parameters()</slot>
+  <slot>calSlope()</slot>
+  <slot>calCurvature()</slot>
+  <slot>slopeDivide()</slot>
+  <slot>add_elevationData()</slot>
+  <slot>paraSetting()</slot>
+  <slot>callme()</slot>
+ </slots>
+</ui>

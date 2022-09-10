@@ -52,7 +52,7 @@ def main():
     else:
         print("=> no checkpoint found at '{}'".format(ckpt))
 
-    # decode function
+    # decode interface
     decode_fn = VillageSegm.decode_target
 
     check_base_name = ckpt.stem

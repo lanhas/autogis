@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="pic">
+    <file>resource/glass.png</file>
+    <file>resource/background.jpg</file>
+  </qresource>
+</RCC>
