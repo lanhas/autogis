@@ -5,7 +5,6 @@ This is a pytorch deep learning program for tradition Chinese settlements (TCSs)
 
 ## Installation
 
----
 Please refer to [requirement.txt](./requirements.txt) for all required packages. Assuming [Anaconda](https://www.anaconda.com/products/distribution) with python 3.8, a step-by-step example for installing this project is as follows
 
 ```commandline
